@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, BookOpen, ArrowRight, Bookmark } from 'lucide-react';
+import { Search, ArrowRight, Bookmark, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { SentimentIndicator } from '@/components/ui/sentiment-indicator';
-import { mockArticles, mockSources } from '@/data/mockData';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -16,18 +17,44 @@ export default function ArticlesPage() {
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [topicFilter, setTopicFilter] = useState<string>('all');
 
-  const allTopics = [...new Set(mockArticles.flatMap(a => a.topic_tags))];
+  const { data: articles = [], isLoading } = useQuery({
+    queryKey: ['articles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('articles')
+        .select('*')
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .limit(200);
+      if (error) throw error;
+      return data;
+    },
+  });
 
-  const filtered = mockArticles.filter(a => {
+  const { data: sources = [] } = useQuery({
+    queryKey: ['sources'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sources')
+        .select('*')
+        .eq('is_active', true)
+        .order('source_name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const allTopics = [...new Set(articles.flatMap(a => a.topic_tags || []))];
+
+  const filtered = articles.filter(a => {
     if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false;
     if (sourceFilter !== 'all' && a.source_name !== sourceFilter) return false;
-    if (topicFilter !== 'all' && !a.topic_tags.includes(topicFilter)) return false;
+    if (topicFilter !== 'all' && !(a.topic_tags || []).includes(topicFilter)) return false;
     return true;
-  }).sort((a, b) => new Date(b.published_at || '').getTime() - new Date(a.published_at || '').getTime());
+  });
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <PageHeader title="Articles" description={`${mockArticles.length} articles from ${mockSources.filter(s => s.is_active).length} active sources`} />
+      <PageHeader title="Articles" description={`${articles.length} articles from ${sources.length} active sources`} />
 
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -38,7 +65,7 @@ export default function ArticlesPage() {
         <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
           className="bg-card border border-border rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30">
           <option value="all">All Sources</option>
-          {mockSources.filter(s => s.is_active).map(s => (
+          {sources.map(s => (
             <option key={s.id} value={s.source_name}>{s.source_name}</option>
           ))}
         </select>
@@ -49,32 +76,42 @@ export default function ArticlesPage() {
         </select>
       </div>
 
-      <div className="space-y-2">
-        {filtered.map((article, i) => (
-          <motion.div key={article.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-            <Link to={`/articles/${article.id}`}>
-              <div className="flex items-center gap-4 bg-card border border-border rounded-xl px-5 py-4 hover:border-primary/30 transition-colors group">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <SourceBadge name={article.source_name} />
-                    <span className="text-xs text-muted-foreground">{formatTime(article.published_at || '')}</span>
-                    <SentimentIndicator sentiment={article.sentiment} showLabel={false} />
-                    {article.is_bookmarked && <Bookmark className="w-3 h-3 text-primary fill-primary" />}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-20 text-muted-foreground">
+          <p>No articles found.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((article, i) => (
+            <motion.div key={article.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
+              <Link to={`/articles/${article.id}`}>
+                <div className="flex items-center gap-4 bg-card border border-border rounded-xl px-5 py-4 hover:border-primary/30 transition-colors group">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <SourceBadge name={article.source_name} />
+                      <span className="text-xs text-muted-foreground">{formatTime(article.published_at || article.imported_at)}</span>
+                      <SentimentIndicator sentiment={article.sentiment} showLabel={false} />
+                      {article.is_bookmarked && <Bookmark className="w-3 h-3 text-primary fill-primary" />}
+                    </div>
+                    <h3 className="font-medium text-sm group-hover:text-primary transition-colors truncate">{article.title}</h3>
+                    {article.author && <p className="text-xs text-muted-foreground mt-0.5">By {article.author}</p>}
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      {(article.topic_tags || []).map(tag => (
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{tag}</span>
+                      ))}
+                    </div>
                   </div>
-                  <h3 className="font-medium text-sm group-hover:text-primary transition-colors truncate">{article.title}</h3>
-                  {article.author && <p className="text-xs text-muted-foreground mt-0.5">By {article.author}</p>}
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    {article.topic_tags.map(tag => (
-                      <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{tag}</span>
-                    ))}
-                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                 </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-              </div>
-            </Link>
-          </motion.div>
-        ))}
-      </div>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
