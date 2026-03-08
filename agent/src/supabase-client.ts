@@ -95,7 +95,6 @@ export async function fetchUningestedUrls(sourceId: string, limit: number) {
   if (error) throw new Error(`Failed to fetch uningested URLs: ${error.message}`);
   return data || [];
 }
-}
 
 export async function insertArticle(sourceId: string, article: {
   canonical_url: string;
