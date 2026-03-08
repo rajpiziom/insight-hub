@@ -20,6 +20,39 @@ const THEME_KEYWORDS: Record<string, string[]> = {
   Policy: ['election', 'parliament', 'congress', 'legislation', 'regulation', 'court', 'supreme court', 'vote', 'law', 'governor', 'president', 'minister', 'prime minister'],
 };
 
+// Noise patterns to filter out non-news content
+const NOISE_PATTERNS = [
+  /subscribe/i,
+  /log\s*in/i,
+  /free trial/i,
+  /newsletter/i,
+  /sign\s*up/i,
+  /mind-expanding/i,
+  /delivered\s+(six|five|seven)\s+days/i,
+  /curated\s+news/i,
+  /direct\s+to\s+your\s+inbox/i,
+  /behind\s+the\s+scenes/i,
+  /future[- ]gazing\s+analysis/i,
+  /predictions\s+and\s+speculation/i,
+  /tune\s+into\s+captivating/i,
+  /registered\s+in\s+england/i,
+  /registered\s+office/i,
+  /vat\s+reg/i,
+  /newspaper\s+limited/i,
+  /word\s+of\s+the\s+week/i,
+  /copyright\s*©/i,
+  /all\s+rights\s+reserved/i,
+  /terms\s+of\s+(use|service)/i,
+  /privacy\s+policy/i,
+  /cookie\s+policy/i,
+  /©\s*\d{4}/,
+  /the\s+economist\s+newspaper/i,
+];
+
+function isNoise(text: string): boolean {
+  return NOISE_PATTERNS.some(pattern => pattern.test(text));
+}
+
 function classifyTheme(text: string): string {
   const lower = text.toLowerCase();
   let bestTheme = 'Other';
@@ -35,10 +68,8 @@ function classifyTheme(text: string): string {
 }
 
 function extractTitle(text: string): string {
-  // Take the first sentence or first 80 chars as title
   const firstSentence = text.match(/^(.{15,80}?[.!?])\s/);
   if (firstSentence) return firstSentence[1];
-  // Bold text at start often contains the subject
   const boldMatch = text.match(/^([A-Z][^.]{10,60})\./);
   if (boldMatch) return boldMatch[1];
   return text.slice(0, 80).trim() + '…';
@@ -56,16 +87,11 @@ export async function scrapeBriefing(url: string = 'https://www.economist.com/th
     await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
     await page.waitForTimeout(3000);
 
-    // Extract briefing items from the rendered DOM
     const rawItems = await page.evaluate(`(() => {
       const items = [];
-      
-      // The World in Brief uses article content with paragraphs separated by <hr>
-      // Find the main content area
       const article = document.querySelector('article') || document.querySelector('[data-body-id]') || document.querySelector('.article__body');
       const container = article || document.body;
       
-      // Strategy 1: Look for paragraphs between <hr> elements
       const allElements = Array.from(container.querySelectorAll('p, hr'));
       let currentText = '';
       
@@ -82,18 +108,15 @@ export async function scrapeBriefing(url: string = 'https://www.economist.com/th
           }
         }
       }
-      // Don't forget the last item
       if (currentText.trim().length > 50) {
         items.push(currentText.trim());
       }
       
-      // Strategy 2: If no items found via HR, look for bold-starting paragraphs
       if (items.length === 0) {
         const paragraphs = container.querySelectorAll('p');
         for (const p of paragraphs) {
           const text = p.innerText?.trim();
           if (!text || text.length < 50) continue;
-          // Briefing items typically start with bold text
           const firstChild = p.firstElementChild;
           if (firstChild && (firstChild.tagName === 'STRONG' || firstChild.tagName === 'B')) {
             items.push(text);
@@ -101,15 +124,7 @@ export async function scrapeBriefing(url: string = 'https://www.economist.com/th
         }
       }
       
-      // Filter out subscription prompts and navigation text
-      return items.filter(t => 
-        !t.includes('Subscribe') && 
-        !t.includes('Log in') && 
-        !t.includes('free trial') &&
-        !t.includes('newsletter') &&
-        t.length > 50 &&
-        t.length < 2000
-      );
+      return items;
     })()`) as string[];
 
     if (!rawItems || rawItems.length === 0) {
@@ -117,9 +132,21 @@ export async function scrapeBriefing(url: string = 'https://www.economist.com/th
       return [];
     }
 
-    console.log(`  Found ${rawItems.length} briefing items`);
+    console.log(`  Found ${rawItems.length} raw items, filtering noise...`);
 
-    const items: BriefingItem[] = rawItems.map(text => {
+    // Filter noise aggressively
+    const cleanItems = rawItems.filter(text => {
+      if (text.length < 80 || text.length > 2000) return false;
+      if (isNoise(text)) return false;
+      // Must contain at least some news-like content (proper nouns, numbers, dates)
+      const hasProperNoun = /[A-Z][a-z]{2,}/.test(text);
+      const hasSpecifics = /\d/.test(text) || /said|announced|reported|according/i.test(text);
+      return hasProperNoun && hasSpecifics;
+    });
+
+    console.log(`  ${cleanItems.length} items after noise filter (removed ${rawItems.length - cleanItems.length})`);
+
+    const items: BriefingItem[] = cleanItems.map(text => {
       const contentHash = createHash('sha256').update(text.slice(0, 200)).digest('hex');
       return {
         title: extractTitle(text),

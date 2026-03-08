@@ -322,13 +322,34 @@ export async function upsertDailyBriefing(sections: BriefingSection[]) {
 
 export async function fetchRecentClusters() {
   const { supabase, userId } = await getSupabase();
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('event_clusters')
-    .select('id, title, short_title, top_keywords')
+    .select('id, title, short_title, top_keywords, top_entities')
     .eq('user_id', userId)
-    .gte('last_updated_at', oneDayAgo)
     .eq('status', 'active');
   if (error) return [];
   return data || [];
+}
+
+export async function upsertBriefingUpdate(item: {
+  cluster_id: string;
+  title: string;
+  summary: string;
+  source_name: string;
+  content_hash: string;
+}) {
+  const { supabase, userId } = await getSupabase();
+  const { error } = await supabase
+    .from('briefing_updates')
+    .upsert({
+      user_id: userId,
+      cluster_id: item.cluster_id,
+      title: item.title,
+      summary: item.summary,
+      source_name: item.source_name,
+      content_hash: item.content_hash,
+      published_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,content_hash' });
+  if (error) console.error(`  ✗ Briefing update upsert failed: ${error.message}`);
+  else console.log(`  ✓ Linked briefing update to cluster: ${item.title.slice(0, 50)}`);
 }
