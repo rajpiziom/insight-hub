@@ -224,7 +224,7 @@ export default function TopicDetailPage() {
                       const el = (
                         <div key={i} className="flex items-start gap-2 text-sm leading-relaxed text-foreground/90">
                           <span className="text-muted-foreground mt-1 shrink-0">•</span>
-                          <span><CitedText text={bullet} articleIndex={articleIndex} citationQuotes={updatesQuotes} citationOffset={offset} /></span>
+                          <span><CitedText text={bullet} articleIndex={articleIndex} citationQuotes={updatesQuotes} citationOffset={offset} fromPath={currentPath} /></span>
                         </div>
                       );
                       offset += countCitations(bullet);
