@@ -13,6 +13,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/briefing', icon: Zap, label: 'Briefing' },
   { to: '/topics', icon: Layers, label: 'Events' },
+  { to: '/tag', icon: Hash, label: 'Topics' },
   { to: '/articles', icon: BookOpen, label: 'Articles' },
   { to: '/sources', icon: Rss, label: 'Sources' },
   { to: '/bookmarks', icon: Bookmark, label: 'Bookmarks' },

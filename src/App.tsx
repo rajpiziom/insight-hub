@@ -62,6 +62,8 @@ function AppWithAuth() {
       <Route path="/articles/:id" element={<AppLayout><ArticleViewPage /></AppLayout>} />
       <Route path="/topics" element={<AppLayout><TopicsPage /></AppLayout>} />
       <Route path="/topics/:id" element={<AppLayout><TopicDetailPage /></AppLayout>} />
+      <Route path="/tag" element={<AppLayout><TagTopicsPage /></AppLayout>} />
+      <Route path="/tag/:tag" element={<AppLayout><TagTopicDetailPage /></AppLayout>} />
       <Route path="/briefing" element={<AppLayout><BriefingPage /></AppLayout>} />
       <Route path="/sources" element={<AppLayout><SourcesPage /></AppLayout>} />
       <Route path="/sources/:id" element={<AppLayout><SourceDetailPage /></AppLayout>} />
