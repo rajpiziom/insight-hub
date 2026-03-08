@@ -1,12 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ExternalLink, Bookmark, CheckCircle, Sparkles, GitCompare, MessageSquare, Clock, User } from 'lucide-react';
-import { PageHeader } from '@/components/ui/page-header';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { SentimentIndicator } from '@/components/ui/sentiment-indicator';
 import { Button } from '@/components/ui/button';
-import { mockArticles, mockSummary } from '@/data/mockData';
-import { useState } from 'react';
+import { mockArticles, mockSummary, mockClusterArticleMap } from '@/data/mockData';
+import { summarizeArticle } from '@/lib/api';
+import { toast } from 'sonner';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -16,6 +17,19 @@ export default function ArticleViewPage() {
   const { id } = useParams();
   const article = mockArticles.find(a => a.id === id);
   const [showSummary, setShowSummary] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+
+  // Find cluster for this article
+  const clusterId = Object.entries(mockClusterArticleMap).find(([, articles]) => articles.includes(id || ''))?.[0];
+
+  const handleSummarize = async () => {
+    if (showSummary) { setShowSummary(false); return; }
+    setShowSummary(true);
+    // For demo, show mock summary. In production, call AI:
+    // setSummarizing(true);
+    // try { await summarizeArticle(article.id); } catch { toast.error('Failed to summarize'); }
+    // setSummarizing(false);
+  };
 
   if (!article) {
     return (
@@ -36,63 +50,39 @@ export default function ArticleViewPage() {
 
       <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl overflow-hidden">
         <div className="p-6 lg:p-8">
-          {/* Meta */}
           <div className="flex items-center gap-3 mb-4">
             <SourceBadge name={article.source_name} />
             <SentimentIndicator sentiment={article.sentiment} />
-            {article.cluster_id && (
-              <Link to={`/topics/${article.cluster_id}`} className="text-xs text-primary hover:underline">
-                View Topic Cluster
-              </Link>
+            {clusterId && (
+              <Link to={`/topics/${clusterId}`} className="text-xs text-primary hover:underline">View Topic Cluster</Link>
             )}
           </div>
 
-          {/* Title */}
           <h1 className="font-display text-2xl lg:text-3xl font-bold mb-4 leading-tight">{article.title}</h1>
 
-          {/* Author / Date */}
           <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6 pb-6 border-b border-border">
             {article.author && (
-              <span className="flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5" /> {article.author}
-              </span>
+              <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {article.author}</span>
             )}
-            <span className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5" /> {formatDate(article.published_at)}
-            </span>
+            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {formatDate(article.published_at || '')}</span>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-muted">Quality: {Math.round(article.confidence_score * 100)}%</span>
           </div>
 
-          {/* Actions */}
           <div className="flex flex-wrap gap-2 mb-8">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowSummary(!showSummary)}>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSummarize}>
               <Sparkles className="w-3.5 h-3.5" /> {showSummary ? 'Hide Summary' : 'Summarise'}
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <GitCompare className="w-3.5 h-3.5" /> Compare
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5" /> Ask AI
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <Bookmark className="w-3.5 h-3.5" /> Save
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <CheckCircle className="w-3.5 h-3.5" /> Mark Read
-            </Button>
-            <a href={article.url} target="_blank" rel="noopener noreferrer">
-              <Button variant="ghost" size="sm" className="gap-1.5">
-                <ExternalLink className="w-3.5 h-3.5" /> Source
-              </Button>
+            <Button variant="outline" size="sm" className="gap-1.5"><GitCompare className="w-3.5 h-3.5" /> Compare</Button>
+            <Button variant="outline" size="sm" className="gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Ask AI</Button>
+            <Button variant="outline" size="sm" className="gap-1.5"><Bookmark className="w-3.5 h-3.5" /> Save</Button>
+            <Button variant="outline" size="sm" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Mark Read</Button>
+            <a href={article.canonical_url} target="_blank" rel="noopener noreferrer">
+              <Button variant="ghost" size="sm" className="gap-1.5"><ExternalLink className="w-3.5 h-3.5" /> Source</Button>
             </a>
           </div>
 
-          {/* AI Summary */}
           {showSummary && article.id === 'a1' && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="bg-muted rounded-xl p-5 mb-8"
-            >
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-muted rounded-xl p-5 mb-8">
               <div className="flex items-center gap-2 mb-3">
                 <Sparkles className="w-4 h-4 text-primary" />
                 <h3 className="font-display font-semibold text-sm">AI Summary</h3>
@@ -121,14 +111,12 @@ export default function ArticleViewPage() {
             </motion.div>
           )}
 
-          {/* Article body */}
           <div className="prose prose-sm max-w-none">
-            {article.full_text.split('\\n\\n').map((paragraph, i) => (
+            {(article.body_text || '').split('\n\n').map((paragraph, i) => (
               <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-4">{paragraph}</p>
             ))}
           </div>
 
-          {/* Tags */}
           <div className="flex items-center gap-1.5 mt-8 pt-6 border-t border-border">
             {article.topic_tags.map(tag => (
               <span key={tag} className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground">{tag}</span>
