@@ -55,7 +55,7 @@ function countCitations(text: string): number {
 
 export default function TopicDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const goBack = () => window.history.back();
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
   const [activeMode, setActiveMode] = useState<'explain' | 'updates' | null>(null);
   const [loading, setLoading] = useState(false);
