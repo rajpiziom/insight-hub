@@ -48,7 +48,7 @@ function BriefingTile({ item, index }: { item: any; index: number }) {
       transition={{ delay: index * 0.03 }}
       className={cn(
         "bg-card border border-border rounded-xl cursor-pointer transition-all hover:border-primary/30",
-        expanded ? "col-span-1 md:col-span-2" : ""
+        expanded ? "col-span-1 md:col-span-2 lg:col-span-3" : ""
       )}
       onClick={() => setExpanded(!expanded)}
     >
