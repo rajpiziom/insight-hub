@@ -116,6 +116,7 @@ export default function TopicDetailPage() {
                 });
                 if (error) throw error;
                 setExplainText(data.summary);
+                if (data.articleIndex) setArticleIndex(data.articleIndex);
               } catch (err: any) {
                 toast.error(err.message || 'Failed');
                 setActiveMode(null);
