@@ -204,4 +204,45 @@ program
     }
   });
 
+program
+  .command('debug')
+  .description('Open a URL in the browser and take a screenshot + dump HTML for debugging')
+  .argument('<url>', 'URL to debug')
+  .action(async (url) => {
+    validateConfig();
+    const { newPage, closeBrowser } = await import('./browser.js');
+    const fs = await import('fs');
+    try {
+      const page = await newPage();
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
+      await page.waitForTimeout(3000);
+
+      // Screenshot
+      await page.screenshot({ path: 'debug-screenshot.png', fullPage: true });
+      console.log('📸 Screenshot saved to debug-screenshot.png');
+
+      // Check login state
+      const pageText = await page.evaluate(`document.body.innerText.substring(0, 500)`);
+      console.log('\\n📄 First 500 chars of page text:');
+      console.log(pageText);
+
+      // Check for paywall indicators
+      const hasPaywall = await page.evaluate(`(() => {
+        const text = document.body.innerText.toLowerCase();
+        return {
+          hasLoginPrompt: text.includes('log in') || text.includes('sign in'),
+          hasSubscribe: text.includes('subscribe') || text.includes('subscription'),
+          hasFreeTrialText: text.includes('free trial') || text.includes('already have an account'),
+          articleParagraphs: document.querySelectorAll('article p').length,
+          totalTextLength: document.querySelector('article') ? document.querySelector('article').innerText.length : 0
+        };
+      })()`);
+      console.log('\\n🔍 Paywall indicators:', JSON.stringify(hasPaywall, null, 2));
+
+      await page.close();
+    } finally {
+      await closeBrowser();
+    }
+  });
+
 program.parse();
