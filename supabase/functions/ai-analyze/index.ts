@@ -350,7 +350,7 @@ serve(async (req) => {
         .single();
 
       const clusterMode = mode || "explain";
-      const citationInstruction = `\n\nCRITICAL: After every factual claim, cite the source article using its number in square brackets, e.g. [1], [2]. Every bullet or sentence with a fact MUST have at least one citation. Multiple citations like [1][3] are fine.`;
+      const citationInstruction = `\n\nCRITICAL: After every factual claim, cite the source article using its number in square brackets, e.g. [1], [2]. Every bullet or sentence with a fact MUST have at least one citation. Multiple citations like [1][3] are fine.\n\nADDITIONALLY: After your main response, add a line "---QUOTES---" followed by a JSON object mapping each citation number to the EXACT verbatim quote (10-30 words) from that article that supports the claim. Example:\n---QUOTES---\n{"1": "exact quote from article 1", "3": "exact quote from article 3"}\nThe quotes MUST be copied verbatim from the article text so they can be found by text search.`;
 
       if (clusterMode === "updates") {
         systemPrompt = `You are a concise news wire editor. The reader ALREADY knows the background — do NOT explain what the event is. Give ONLY the latest developments as short, punchy bullet points (max 8 bullets total). Each bullet: one sentence, specific (names, dates, figures). End with 2-3 "What to watch" bullets on near-term outlook. Use markdown bullets (- ). No headings, no paragraphs, no preamble.` + citationInstruction;
