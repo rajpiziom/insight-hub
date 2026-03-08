@@ -69,9 +69,18 @@ async function syncSource(source: SourceRow) {
 
     console.log(`\n📊 Discovery complete: ${urlsDiscovered} found, ${urlsNew} new`);
 
-    // Step 3: Extract and import new articles (limit per section for testing)
+    // Step 3: Gather URLs to extract (new + previously failed)
     const MAX_PER_SECTION = 2;
-    const toExtract = allDiscovered.slice(0, allEndpoints.length * MAX_PER_SECTION);
+    let toExtract = allDiscovered.slice(0, allEndpoints.length * MAX_PER_SECTION);
+
+    // Also pick up previously discovered but un-ingested URLs
+    if (toExtract.length === 0) {
+      const uningested = await fetchUningestedUrls(source.id, allEndpoints.length * MAX_PER_SECTION);
+      if (uningested.length > 0) {
+        console.log(`\n🔄 Retrying ${uningested.length} previously discovered but un-ingested URLs...`);
+        toExtract = uningested.map(u => ({ url: u.url, title: u.title }));
+      }
+    }
 
     if (toExtract.length > 0) {
       console.log(`\n📥 Extracting ${toExtract.length} of ${allDiscovered.length} new articles (limit ${MAX_PER_SECTION}/section)...\n`);
