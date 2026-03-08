@@ -350,7 +350,7 @@ serve(async (req) => {
         .single();
 
       const clusterMode = mode || "explain";
-      const citationInstruction = `\n\nCRITICAL: After every factual claim, cite the source article using its number in square brackets, e.g. [1], [2]. Every bullet or sentence with a fact MUST have at least one citation. Multiple citations like [1][3] are fine.\n\nADDITIONALLY: After your main response, add a line "---QUOTES---" followed by a JSON object mapping each citation number to the EXACT verbatim quote (10-30 words) from that article that supports the claim. Example:\n---QUOTES---\n{"1": "exact quote from article 1", "3": "exact quote from article 3"}\nThe quotes MUST be copied verbatim from the article text so they can be found by text search.`;
+      const citationInstruction = `\n\nCRITICAL: After every factual claim, cite the source article using its number in square brackets, e.g. [1], [2]. Every bullet or sentence with a fact MUST have at least one citation. Multiple citations like [1][3] are fine.\n\nADDITIONALLY: After your main response, add a line "---QUOTES---" followed by a JSON ARRAY listing the quotes in the EXACT order the citations appear in the text, left-to-right, top-to-bottom. Each element: {"num": articleNumber, "quote": "exact verbatim 10-30 word quote from that article"}. If the same article [1] is cited 3 times in the text for 3 different facts, there must be 3 separate entries with different quotes. The total number of entries MUST equal the total number of citation markers in the text. The quotes MUST be copied verbatim from the article text so they can be found by text search.`;
 
       if (clusterMode === "updates") {
         systemPrompt = `You are a concise news wire editor. The reader ALREADY knows the background — do NOT explain what the event is. Give ONLY the latest developments as short, punchy bullet points (max 8 bullets total). Each bullet: one sentence, specific (names, dates, figures). End with 2-3 "What to watch" bullets on near-term outlook. Use markdown bullets (- ). No headings, no paragraphs, no preamble.` + citationInstruction;
@@ -385,29 +385,24 @@ serve(async (req) => {
       const data = await response.json();
       const summary = data.choices?.[0]?.message?.content || "";
 
-      // Build article index mapping: number -> { id, title, quote }
-      const articleIndex: Record<number, { id: string; title: string; quote?: string }> = {};
+      // Build article index mapping: number -> { id, title }
+      const articleIndex: Record<number, { id: string; title: string }> = {};
       (articles || []).forEach((a, i) => {
         articleIndex[i + 1] = { id: a.id, title: a.title };
       });
 
-      // Parse quotes from the response
+      // Parse ordered quotes array from the response
       let cleanSummary = summary;
+      let citationQuotes: { num: number; quote: string }[] = [];
       const quotesSplit = summary.split("---QUOTES---");
       if (quotesSplit.length > 1) {
         cleanSummary = quotesSplit[0].trim();
         try {
-          const quotes = JSON.parse(quotesSplit[1].trim());
-          for (const [num, quote] of Object.entries(quotes)) {
-            const idx = parseInt(num);
-            if (articleIndex[idx]) {
-              articleIndex[idx].quote = quote as string;
-            }
-          }
+          citationQuotes = JSON.parse(quotesSplit[1].trim());
         } catch {}
       }
 
-      return new Response(JSON.stringify({ success: true, summary: cleanSummary, articleIndex }), {
+      return new Response(JSON.stringify({ success: true, summary: cleanSummary, articleIndex, citationQuotes }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

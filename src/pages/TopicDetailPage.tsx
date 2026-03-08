@@ -15,8 +15,15 @@ function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<number, { id: string; title: string; quote?: string }> }) {
+// CitedText renders inline citation markers as links to the specific passage in the article
+function CitedText({ text, articleIndex, citationQuotes, citationOffset }: { 
+  text: string; 
+  articleIndex: Record<number, { id: string; title: string }>; 
+  citationQuotes: { num: number; quote: string }[];
+  citationOffset: number;
+}) {
   const parts = text.split(/(\[\d+\])/g);
+  let localIdx = 0;
   return (
     <>
       {parts.map((part, i) => {
@@ -24,10 +31,12 @@ function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<
         if (match) {
           const num = parseInt(match[1]);
           const article = articleIndex[num];
+          const quoteEntry = citationQuotes[citationOffset + localIdx];
+          localIdx++;
           if (article) {
-            const highlightParam = article.quote ? `?highlight=${encodeURIComponent(article.quote)}` : '';
+            const highlightParam = quoteEntry?.quote ? `?highlight=${encodeURIComponent(quoteEntry.quote)}` : '';
             return (
-              <Link key={i} to={`/articles/${article.id}${highlightParam}`} className="inline-flex items-center no-underline" title={article.title}>
+              <Link key={i} to={`/articles/${article.id}${highlightParam}`} className="inline-flex items-center no-underline" title={quoteEntry?.quote || article.title}>
                 <span className="text-[10px] font-medium text-primary bg-primary/10 rounded px-1 py-0.5 hover:bg-primary/20 transition-colors cursor-pointer">{num}</span>
               </Link>
             );
@@ -39,6 +48,11 @@ function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<
   );
 }
 
+// Count citation markers in a string
+function countCitations(text: string): number {
+  return (text.match(/\[\d+\]/g) || []).length;
+}
+
 export default function TopicDetailPage() {
   const { id } = useParams();
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
@@ -46,7 +60,9 @@ export default function TopicDetailPage() {
   const [loading, setLoading] = useState(false);
   const [explainText, setExplainText] = useState<string | null>(null);
   const [updatesText, setUpdatesText] = useState<string | null>(null);
-  const [articleIndex, setArticleIndex] = useState<Record<number, { id: string; title: string; quote?: string }>>({});
+  const [articleIndex, setArticleIndex] = useState<Record<number, { id: string; title: string }>>({});
+  const [explainQuotes, setExplainQuotes] = useState<{ num: number; quote: string }[]>([]);
+  const [updatesQuotes, setUpdatesQuotes] = useState<{ num: number; quote: string }[]>([]);
 
   const { data: cluster, isLoading: clusterLoading } = useQuery({
     queryKey: ['cluster', id],
@@ -140,7 +156,8 @@ export default function TopicDetailPage() {
                 });
                 if (error) throw error;
                 setExplainText(data.summary);
-                if (data.articleIndex) setArticleIndex(data.articleIndex);
+                if (data.articleIndex) setArticleIndex(prev => ({ ...prev, ...data.articleIndex }));
+                if (data.citationQuotes) setExplainQuotes(data.citationQuotes);
               } catch (err: any) {
                 toast.error(err.message || 'Failed');
                 setActiveMode(null);
@@ -159,7 +176,8 @@ export default function TopicDetailPage() {
                 });
                 if (error) throw error;
                 setUpdatesText(data.summary);
-                if (data.articleIndex) setArticleIndex(data.articleIndex);
+                if (data.articleIndex) setArticleIndex(prev => ({ ...prev, ...data.articleIndex }));
+                if (data.citationQuotes) setUpdatesQuotes(data.citationQuotes);
               } catch (err: any) {
                 toast.error(err.message || 'Failed');
                 setActiveMode(null);
@@ -178,23 +196,37 @@ export default function TopicDetailPage() {
                 </div>
               ) : (activeMode === 'explain' && explainText) ? (
                 <div className="prose prose-sm max-w-none">
-                  {explainText.split('\n\n').map((p, i) => (
-                    <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">
-                      <CitedText text={p} articleIndex={articleIndex} />
-                    </p>
-                  ))}
+                  {(() => {
+                    const paragraphs = explainText.split('\n\n');
+                    let offset = 0;
+                    return paragraphs.map((p, i) => {
+                      const el = (
+                        <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">
+                          <CitedText text={p} articleIndex={articleIndex} citationQuotes={explainQuotes} citationOffset={offset} />
+                        </p>
+                      );
+                      offset += countCitations(p);
+                      return el;
+                    });
+                  })()}
                 </div>
               ) : (activeMode === 'updates' && updatesText) ? (
                 <div className="space-y-1.5">
-                  {updatesText.split('\n').filter(l => l.trim()).map((line, i) => {
-                    const bullet = line.replace(/^[-*]\s*/, '');
-                    return (
-                      <div key={i} className="flex items-start gap-2 text-sm leading-relaxed text-foreground/90">
-                        <span className="text-muted-foreground mt-1 shrink-0">•</span>
-                        <span><CitedText text={bullet} articleIndex={articleIndex} /></span>
-                      </div>
-                    );
-                  })}
+                  {(() => {
+                    const lines = updatesText.split('\n').filter(l => l.trim());
+                    let offset = 0;
+                    return lines.map((line, i) => {
+                      const bullet = line.replace(/^[-*]\s*/, '');
+                      const el = (
+                        <div key={i} className="flex items-start gap-2 text-sm leading-relaxed text-foreground/90">
+                          <span className="text-muted-foreground mt-1 shrink-0">•</span>
+                          <span><CitedText text={bullet} articleIndex={articleIndex} citationQuotes={updatesQuotes} citationOffset={offset} /></span>
+                        </div>
+                      );
+                      offset += countCitations(bullet);
+                      return el;
+                    });
+                  })()}
                 </div>
               ) : null}
               {!loading && Object.keys(articleIndex).length > 0 && (
