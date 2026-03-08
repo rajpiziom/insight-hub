@@ -85,22 +85,32 @@ async function syncSource(source: SourceRow) {
     }
 
     if (toExtract.length > 0) {
-      console.log(`\n📥 Extracting ${toExtract.length} of ${allDiscovered.length} new articles (limit ${MAX_PER_SECTION}/section)...\n`);
+      const CONCURRENCY = 5;
+      console.log(`\n📥 Extracting ${toExtract.length} of ${allDiscovered.length} new articles (${CONCURRENCY} at a time)...\n`);
 
-      for (const link of toExtract) {
-        try {
-          const article = await extractArticle(link.url);
-          if (article) {
-            const result = await upsertArticle(source.id, article);
-            if (!result.deduplicated && result.articleId) {
-              articlesImported++;
-              console.log(`    ✓ Imported: ${article.title}`);
+      // Process in parallel batches
+      for (let i = 0; i < toExtract.length; i += CONCURRENCY) {
+        const batch = toExtract.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map(async (link) => {
+            try {
+              const article = await extractArticle(link.url);
+              if (article) {
+                const result = await upsertArticle(source.id, article);
+                if (!result.deduplicated && result.articleId) {
+                  articlesImported++;
+                  console.log(`    ✓ Imported: ${article.title}`);
+                }
+              }
+            } catch (err: any) {
+              errors.push(`Extract failed for ${link.url}: ${err.message}`);
+              console.error(`    ✗ Failed: ${err.message}`);
             }
-          }
-          await new Promise(r => setTimeout(r, 1500));
-        } catch (err: any) {
-          errors.push(`Extract failed for ${link.url}: ${err.message}`);
-          console.error(`    ✗ Failed: ${err.message}`);
+          })
+        );
+        // Brief pause between batches to be polite
+        if (i + CONCURRENCY < toExtract.length) {
+          await new Promise(r => setTimeout(r, 500));
         }
       }
     }
