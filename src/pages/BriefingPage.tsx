@@ -48,7 +48,7 @@ function BriefingTile({ item, index }: { item: any; index: number }) {
       transition={{ delay: index * 0.03 }}
       className={cn(
         "bg-card border border-border rounded-xl cursor-pointer transition-all hover:border-primary/30",
-        expanded ? "col-span-1 md:col-span-2" : ""
+        expanded ? "col-span-1 md:col-span-2 lg:col-span-3" : ""
       )}
       onClick={() => setExpanded(!expanded)}
     >
@@ -81,13 +81,13 @@ function BriefingTile({ item, index }: { item: any; index: number }) {
               {item.why_it_matters && (
                 <p className="text-xs text-primary/80 italic mb-2">Why it matters: {item.why_it_matters}</p>
               )}
-              <div className="flex items-center justify-between pt-1 border-t border-border mt-2">
+              <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
                 <div className="flex items-center gap-1.5">
-                  {item.sources.map((s: string) => <SourceBadge key={s} name={s} />)}
+                  {item.sources?.map((s: string) => <SourceBadge key={s} name={s} />)}
                 </div>
                 {item.cluster_id && (
                   <Link to={`/topics/${item.cluster_id}`} onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="sm" className="text-xs gap-1 text-primary h-7">View Event →</Button>
+                    <Button variant="default" size="sm" className="text-xs gap-1 h-7">View Event →</Button>
                   </Link>
                 )}
               </div>
