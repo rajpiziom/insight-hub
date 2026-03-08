@@ -27,15 +27,15 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
     await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
 
     // Scroll through the page to trigger lazy loading
-    await page.evaluate(async () => {
-      const delay = (ms) => new Promise(r => setTimeout(r, ms));
+    await page.evaluate(`(async () => {
+      const delay = ms => new Promise(r => setTimeout(r, ms));
       const h = document.body.scrollHeight;
       for (let y = 0; y < h; y += 500) {
         window.scrollTo(0, y);
         await delay(200);
       }
       window.scrollTo(0, 0);
-    });
+    })()`);
     await page.waitForTimeout(1500);
 
     // Extract directly from the live rendered DOM via Playwright
