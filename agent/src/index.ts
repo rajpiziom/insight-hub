@@ -68,11 +68,14 @@ async function syncSource(source: SourceRow) {
 
     console.log(`\n📊 Discovery complete: ${urlsDiscovered} found, ${urlsNew} new`);
 
-    // Step 3: Extract and import new articles
-    if (allDiscovered.length > 0) {
-      console.log(`\n📥 Extracting ${allDiscovered.length} new articles...\n`);
+    // Step 3: Extract and import new articles (limit per section for testing)
+    const MAX_PER_SECTION = 2;
+    const toExtract = allDiscovered.slice(0, allEndpoints.length * MAX_PER_SECTION);
 
-      for (const link of allDiscovered) {
+    if (toExtract.length > 0) {
+      console.log(`\n📥 Extracting ${toExtract.length} of ${allDiscovered.length} new articles (limit ${MAX_PER_SECTION}/section)...\n`);
+
+      for (const link of toExtract) {
         try {
           const article = await extractArticle(link.url);
           if (article) {
@@ -82,7 +85,6 @@ async function syncSource(source: SourceRow) {
               console.log(`    ✓ Imported: ${article.title}`);
             }
           }
-          // Small delay to be respectful
           await new Promise(r => setTimeout(r, 1500));
         } catch (err: any) {
           errors.push(`Extract failed for ${link.url}: ${err.message}`);
