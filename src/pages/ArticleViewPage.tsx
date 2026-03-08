@@ -293,5 +293,6 @@ export default function ArticleViewPage() {
         </div>
       </motion.article>
     </div>
+    </>
   );
 }
