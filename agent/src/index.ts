@@ -151,7 +151,7 @@ async function runOnce(globalLimit?: number) {
     sources.forEach(s => console.log(`  • ${s.source_name} (${s.source_type})`));
 
     for (const source of sources) {
-      await syncSource(source);
+      await syncSource(source, globalLimit);
     }
   } finally {
     await closeBrowser();
