@@ -57,8 +57,7 @@ function HighlightedBody({ bodyText, highlight, bodyRef }: { bodyText: string; h
     </div>
   );
 }
-
-
+function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
