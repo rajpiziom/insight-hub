@@ -134,7 +134,7 @@ async function syncSource(source: SourceRow, globalLimit?: number) {
   console.log(`\n✅ Sync complete: ${articlesImported} imported, ${errors.length} errors`);
 }
 
-async function runOnce() {
+async function runOnce(globalLimit?: number) {
   validateConfig();
   console.log('🚀 News Intelligence Hub — Local Agent');
   console.log(`   Time: ${new Date().toLocaleString()}\n`);
