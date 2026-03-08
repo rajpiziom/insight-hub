@@ -143,10 +143,17 @@ export default function BriefingPage() {
   const content: BriefingContent | null = briefing?.content ?? null;
   const sections = content?.sections ?? [];
 
-  // Flatten all items with their theme for the grid
-  const allItems = sections.flatMap(section =>
-    section.items.map(item => ({ ...item, theme: section.theme }))
-  );
+  // Group items by theme, filtering noise
+  const groupedByTheme = sections
+    .map(section => ({
+      theme: section.theme,
+      items: section.items.filter(item =>
+        !isClientNoise(item.title) && !isClientNoise(item.summary)
+      ),
+    }))
+    .filter(g => g.items.length > 0);
+
+  const totalItems = groupedByTheme.reduce((s, g) => s + g.items.length, 0);
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
@@ -172,7 +179,7 @@ export default function BriefingPage() {
             </div>
           ))}
         </div>
-      ) : !briefing || allItems.length === 0 ? (
+      ) : !briefing || totalItems === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Inbox className="w-12 h-12 text-muted-foreground/40 mb-4" />
           <h3 className="font-display font-semibold text-lg mb-2">No briefing available</h3>
@@ -182,26 +189,29 @@ export default function BriefingPage() {
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Zap className="w-4 h-4 text-primary" />
-              <span>
-                {new Date(briefing.generated_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                {!isRecent && <span className="ml-2 text-warning text-xs">(older than 24h)</span>}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {sections.map(s => (
-                <span key={s.theme} className={cn('px-2 py-0.5 rounded text-[10px] font-semibold', categoryColors[s.theme] || categoryColors.Other)}>
-                  {s.theme} ({s.items.length})
-                </span>
-              ))}
-            </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2 mb-5">
+            <Zap className="w-4 h-4 text-primary" />
+            <span>
+              {new Date(briefing.generated_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {!isRecent && <span className="ml-2 text-warning text-xs">(older than 24h)</span>}
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {allItems.map((item, i) => (
-              <BriefingTile key={i} item={item} index={i} />
+          <div className="space-y-6">
+            {groupedByTheme.map((group) => (
+              <div key={group.theme}>
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className={cn('px-2.5 py-0.5 rounded text-xs font-semibold', categoryColors[group.theme] || categoryColors.Other)}>
+                    {group.theme}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{group.items.length} items</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {group.items.map((item, i) => (
+                    <BriefingTile key={i} item={item} index={i} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </>
