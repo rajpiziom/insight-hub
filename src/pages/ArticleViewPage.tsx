@@ -117,7 +117,28 @@ export default function ArticleViewPage() {
               {summaryLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {summaryLoading ? 'Summarising...' : showSummary ? 'Hide Summary' : 'Summarise'}
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5"><Bookmark className="w-3.5 h-3.5" /> Save</Button>
+            <Button variant="outline" size="sm" className="gap-1.5" disabled={bookmarkLoading} onClick={async () => {
+              setBookmarkLoading(true);
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Not authenticated');
+                if (isBookmarked) {
+                  await supabase.from('bookmarks').delete().eq('article_id', id!).eq('user_id', user.id);
+                  setIsBookmarked(false);
+                  toast.success('Removed from bookmarks');
+                } else {
+                  await supabase.from('bookmarks').insert({ article_id: id!, user_id: user.id });
+                  setIsBookmarked(true);
+                  toast.success('Saved to bookmarks');
+                }
+              } catch (err: any) {
+                toast.error(err.message);
+              } finally {
+                setBookmarkLoading(false);
+              }
+            }}>
+              <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-primary' : ''}`} /> {isBookmarked ? 'Saved' : 'Save'}
+            </Button>
             <Button variant="outline" size="sm" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Mark Read</Button>
             <a href={article.canonical_url} target="_blank" rel="noopener noreferrer">
               <Button variant="ghost" size="sm" className="gap-1.5"><ExternalLink className="w-3.5 h-3.5" /> Source</Button>
