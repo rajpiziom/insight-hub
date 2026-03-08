@@ -9,6 +9,8 @@ import ArticlesPage from "./pages/ArticlesPage";
 import ArticleViewPage from "./pages/ArticleViewPage";
 import TopicsPage from "./pages/TopicsPage";
 import TopicDetailPage from "./pages/TopicDetailPage";
+import TagTopicsPage from "./pages/TagTopicsPage";
+import TagTopicDetailPage from "./pages/TagTopicDetailPage";
 import BriefingPage from "./pages/BriefingPage";
 import SourcesPage from "./pages/SourcesPage";
 import SourceDetailPage from "./pages/SourceDetailPage";
