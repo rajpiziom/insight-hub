@@ -1,5 +1,5 @@
-import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ExternalLink, Bookmark, CheckCircle, Sparkles, Clock, User, Loader2 } from 'lucide-react';
 import { SourceBadge } from '@/components/ui/source-badge';
@@ -9,17 +9,68 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+function HighlightedBody({ bodyText, highlight, bodyRef }: { bodyText: string; highlight: string | null; bodyRef: React.RefObject<HTMLDivElement | null> }) {
+  const highlightRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (highlight && highlightRef.current) {
+      setTimeout(() => {
+        highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  }, [highlight]);
+
+  const paragraphs = bodyText.split('\n\n');
+
+  if (!highlight) {
+    return (
+      <div className="prose prose-sm max-w-none" ref={bodyRef}>
+        {paragraphs.map((p, i) => (
+          <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-4">{p}</p>
+        ))}
+      </div>
+    );
+  }
+
+  // Find and highlight the matching text (case-insensitive fuzzy match)
+  const lowerHighlight = highlight.toLowerCase();
+
+  return (
+    <div className="prose prose-sm max-w-none" ref={bodyRef}>
+      {paragraphs.map((paragraph, i) => {
+        const lowerParagraph = paragraph.toLowerCase();
+        const matchIdx = lowerParagraph.indexOf(lowerHighlight);
+        if (matchIdx === -1) {
+          return <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-4">{paragraph}</p>;
+        }
+        const before = paragraph.substring(0, matchIdx);
+        const matched = paragraph.substring(matchIdx, matchIdx + highlight.length);
+        const after = paragraph.substring(matchIdx + highlight.length);
+        return (
+          <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-4">
+            {before}
+            <span ref={highlightRef} className="bg-warning/30 text-foreground rounded px-0.5 py-0.5 ring-2 ring-warning/50">{matched}</span>
+            {after}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export default function ArticleViewPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const highlightQuery = searchParams.get('highlight');
   const [showSummary, setShowSummary] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; key_takeaways?: string[]; why_it_matters?: string; implications?: string } | null>(null);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   const { data: article, isLoading } = useQuery({
     queryKey: ['article', id],
@@ -183,11 +234,7 @@ export default function ArticleViewPage() {
             <img src={article.hero_image_url} alt={article.title} className="w-full rounded-xl mb-8 object-cover max-h-96" />
           )}
 
-          <div className="prose prose-sm max-w-none">
-            {(article.body_text || '').split('\n\n').map((paragraph, i) => (
-              <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-4">{paragraph}</p>
-            ))}
-          </div>
+          <HighlightedBody bodyText={article.body_text || ''} highlight={highlightQuery} bodyRef={bodyRef} />
 
           <div className="flex items-center gap-1.5 mt-8 pt-6 border-t border-border">
             {(article.topic_tags || []).map(tag => (
