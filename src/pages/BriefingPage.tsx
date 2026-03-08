@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Calendar, RefreshCw, Inbox, ChevronDown, ChevronUp } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
@@ -8,6 +8,7 @@ import { categoryColors } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { fetchBriefing, generateBriefing } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { DailyBriefing, BriefingContent } from '@/types';
 
@@ -119,8 +120,31 @@ export default function BriefingPage() {
     }
   };
 
+  const [clusterMap, setClusterMap] = useState<Record<string, string>>({}); // title snippet -> cluster_id
+
+  const loadBriefingUpdates = async () => {
+    try {
+      const { data } = await supabase
+        .from('briefing_updates')
+        .select('title, summary, cluster_id')
+        .not('cluster_id', 'is', null);
+      if (data) {
+        const map: Record<string, string> = {};
+        for (const u of data) {
+          if (u.cluster_id) {
+            // Index by first 60 chars of summary for matching
+            map[u.summary.slice(0, 60).toLowerCase()] = u.cluster_id;
+            map[u.title.toLowerCase()] = u.cluster_id;
+          }
+        }
+        setClusterMap(map);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     loadBriefing();
+    loadBriefingUpdates();
   }, []);
 
   const handleRegenerate = async () => {
@@ -143,13 +167,23 @@ export default function BriefingPage() {
   const content: BriefingContent | null = briefing?.content ?? null;
   const sections = content?.sections ?? [];
 
+  // Enrich items with cluster_id from briefing_updates if not already set
+  const enrichItem = (item: any) => {
+    if (item.cluster_id) return item;
+    const summaryKey = item.summary?.slice(0, 60).toLowerCase();
+    const titleKey = item.title?.toLowerCase();
+    const clusterId = clusterMap[summaryKey] || clusterMap[titleKey];
+    if (clusterId) return { ...item, cluster_id: clusterId };
+    return item;
+  };
+
   // Group items by theme, filtering noise
   const groupedByTheme = sections
     .map(section => ({
       theme: section.theme,
-      items: section.items.filter(item =>
-        !isClientNoise(item.title) && !isClientNoise(item.summary)
-      ),
+      items: section.items
+        .filter(item => !isClientNoise(item.title) && !isClientNoise(item.summary))
+        .map(enrichItem),
     }))
     .filter(g => g.items.length > 0);
 

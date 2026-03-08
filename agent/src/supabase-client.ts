@@ -326,7 +326,7 @@ export async function fetchRecentClusters() {
     .from('event_clusters')
     .select('id, title, short_title, top_keywords, top_entities')
     .eq('user_id', userId)
-    .eq('status', 'active');
+    .in('status', ['active', 'developing']);
   if (error) return [];
   return data || [];
 }
