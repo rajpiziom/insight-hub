@@ -104,8 +104,11 @@ export async function newPage(): Promise<Page> {
 
 export async function closeBrowser() {
   if (browser) {
-    // Disconnect from the browser WITHOUT closing it
-    browser.disconnect();
+    try {
+      await browser.close();
+    } catch {
+      // CDP connection may already be closed, that's fine
+    }
     browser = null;
     context = null;
   }
