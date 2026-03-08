@@ -157,11 +157,17 @@ export async function insertArticle(sourceId: string, article: {
     .eq('user_id', userId);
 
   // Increment source article count
-  await supabase.rpc('', {}).catch(() => {}); // placeholder
-  await supabase
+  const { data: sourceData } = await supabase
     .from('sources')
-    .update({ article_count: undefined as any }) // will handle via a separate update
-    .eq('id', sourceId);
+    .select('article_count')
+    .eq('id', sourceId)
+    .single();
+  if (sourceData) {
+    await supabase
+      .from('sources')
+      .update({ article_count: (sourceData.article_count || 0) + 1 })
+      .eq('id', sourceId);
+  }
 
   return { deduplicated: false, articleId: data.id };
 }
