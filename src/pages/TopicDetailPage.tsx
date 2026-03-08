@@ -196,11 +196,19 @@ export default function TopicDetailPage() {
                 </div>
               ) : (activeMode === 'explain' && explainText) ? (
                 <div className="prose prose-sm max-w-none">
-                  {explainText.split('\n\n').map((p, i) => (
-                    <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">
-                      <CitedText text={p} articleIndex={articleIndex} />
-                    </p>
-                  ))}
+                  {(() => {
+                    const paragraphs = explainText.split('\n\n');
+                    let offset = 0;
+                    return paragraphs.map((p, i) => {
+                      const el = (
+                        <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">
+                          <CitedText text={p} articleIndex={articleIndex} citationQuotes={explainQuotes} citationOffset={offset} />
+                        </p>
+                      );
+                      offset += countCitations(p);
+                      return el;
+                    });
+                  })()}
                 </div>
               ) : (activeMode === 'updates' && updatesText) ? (
                 <div className="space-y-1.5">
