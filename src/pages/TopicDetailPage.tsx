@@ -1,13 +1,14 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, GitCompare, BookOpen, LayoutList, Columns, Clock, Loader2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, LayoutList, Columns, Clock, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SentimentIndicator } from '@/components/ui/sentiment-indicator';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import economistLogo from '@/assets/economist-logo.png';
+import { toast } from 'sonner';
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -16,6 +17,9 @@ function formatTime(dateStr: string) {
 export default function TopicDetailPage() {
   const { id } = useParams();
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [eventSummary, setEventSummary] = useState<string | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
 
   const { data: cluster, isLoading: clusterLoading } = useQuery({
     queryKey: ['cluster', id],
