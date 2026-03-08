@@ -101,6 +101,43 @@ export default function TopicDetailPage() {
               <span key={kw} className="text-xs px-2 py-0.5 rounded-md bg-muted text-muted-foreground">{kw}</span>
             ))}
           </div>
+
+          <Button variant="outline" size="sm" className="gap-1.5" disabled={summaryLoading} onClick={async () => {
+            if (eventSummary) { setShowSummary(!showSummary); return; }
+            setSummaryLoading(true);
+            setShowSummary(true);
+            try {
+              const { data, error } = await supabase.functions.invoke('ai-analyze', {
+                body: { action: 'summarize-cluster', clusterId: id },
+              });
+              if (error) throw error;
+              setEventSummary(data.summary);
+            } catch (err: any) {
+              toast.error('Failed: ' + (err.message || 'Unknown error'));
+              setShowSummary(false);
+            } finally {
+              setSummaryLoading(false);
+            }
+          }}>
+            {summaryLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            {summaryLoading ? 'Generating...' : showSummary ? 'Hide Summary' : 'AI Event Summary'}
+          </Button>
+
+          {showSummary && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 p-5 rounded-xl bg-muted/50 border border-border">
+              {summaryLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Synthesizing {articles.length} articles...
+                </div>
+              ) : eventSummary ? (
+                <div className="prose prose-sm max-w-none">
+                  {eventSummary.split('\n\n').map((p, i) => (
+                    <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">{p}</p>
+                  ))}
+                </div>
+              ) : null}
+            </motion.div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 mb-4">
