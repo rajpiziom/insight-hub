@@ -186,11 +186,7 @@ export default function ArticleViewPage() {
             <img src={article.hero_image_url} alt={article.title} className="w-full rounded-xl mb-8 object-cover max-h-96" />
           )}
 
-          <div className="prose prose-sm max-w-none">
-            {(article.body_text || '').split('\n\n').map((paragraph, i) => (
-              <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-4">{paragraph}</p>
-            ))}
-          </div>
+          <HighlightedBody bodyText={article.body_text || ''} highlight={highlightQuery} bodyRef={bodyRef} />
 
           <div className="flex items-center gap-1.5 mt-8 pt-6 border-t border-border">
             {(article.topic_tags || []).map(tag => (
