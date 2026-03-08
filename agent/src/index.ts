@@ -5,7 +5,7 @@ import {
   fetchDiscoveryEndpoints,
   isUrlKnown,
   insertDiscoveredUrl,
-  insertArticle,
+  upsertArticle,
   fetchUningestedUrls,
   fetchShortArticles,
   updateArticleBody,
