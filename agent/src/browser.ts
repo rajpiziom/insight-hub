@@ -1,36 +1,36 @@
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { config } from './config.js';
 
-let browser: Browser | null = null;
 let context: BrowserContext | null = null;
 
 /**
- * Launch a Playwright browser using the user's Chrome profile.
- * This automatically picks up cookies/sessions from the user's normal Chrome.
+ * Launch a Playwright browser using the user's Edge or Chrome profile.
+ * This automatically picks up cookies/sessions from the user's normal browser.
  * 
- * IMPORTANT: Chrome must be closed before running the agent,
- * or use a separate Chrome profile directory.
+ * IMPORTANT: The browser must be closed before running the agent,
+ * as the browser locks the profile directory.
  */
 export async function launchBrowser(): Promise<BrowserContext> {
   if (context) return context;
 
-  console.log('🌐 Launching browser with your Chrome profile...');
-  console.log(`   Profile: ${config.chromeProfilePath}`);
+  const browserName = config.browserType === 'edge' ? 'Microsoft Edge' : 'Chrome';
+  console.log(`🌐 Launching browser with your ${browserName} profile...`);
+  console.log(`   Profile: ${config.browserProfilePath}`);
 
-  // Launch Chromium using the user's Chrome profile for authenticated sessions
-  browser = await chromium.launchPersistentContext(config.chromeProfilePath, {
+  // For Edge, we use the msedge channel; for Chrome, use chrome channel
+  const channel = config.browserType === 'edge' ? 'msedge' : 'chrome';
+
+  context = await chromium.launchPersistentContext(config.browserProfilePath, {
     headless: config.headless,
+    channel,
     args: [
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-blink-features=AutomationControlled',
     ],
     viewport: { width: 1280, height: 900 },
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  }) as unknown as BrowserContext;
-
-  // The persistent context IS the browser context
-  context = browser as unknown as BrowserContext;
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+  });
 
   return context;
 }
@@ -41,9 +41,8 @@ export async function newPage(): Promise<Page> {
 }
 
 export async function closeBrowser() {
-  if (browser) {
-    await browser.close();
-    browser = null;
+  if (context) {
+    await context.close();
     context = null;
   }
 }
