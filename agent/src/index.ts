@@ -155,36 +155,49 @@ async function syncBriefings() {
   console.log(`📋 Syncing briefings`);
   console.log(`═══════════════════════════════════════`);
 
-  // For now, only The Economist's World in Brief
   const briefingUrls = [
     { source: 'The Economist', url: 'https://www.economist.com/the-world-in-brief' },
   ];
 
   const allItems: { theme: string; items: BriefingSection['items'] }[] = [];
 
+  // Fetch clusters once for matching
+  const clusters = await fetchRecentClusters();
+
   for (const { source, url } of briefingUrls) {
     const items = await scrapeBriefing(url);
     if (items.length === 0) continue;
 
-    // Try to match items to existing clusters
-    const clusters = await fetchRecentClusters();
-
     for (const item of items) {
-      // Simple keyword matching to link to clusters
+      // Match to clusters using keywords + entities
       let matchedClusterId: string | undefined;
+      let bestMatchScore = 0;
       const itemLower = item.summary.toLowerCase();
+
       for (const cluster of clusters) {
         const keywords = cluster.top_keywords || [];
-        const titleWords = (cluster.short_title || cluster.title).toLowerCase().split(/\s+/);
-        const allKeywords = [...keywords, ...titleWords];
-        const matchCount = allKeywords.filter(kw => itemLower.includes(kw.toLowerCase())).length;
-        if (matchCount >= 2) {
+        const entities = cluster.top_entities || [];
+        const titleWords = (cluster.short_title || cluster.title).toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+        const allTerms = [...keywords, ...entities, ...titleWords];
+        const matchCount = allTerms.filter(kw => itemLower.includes(kw.toLowerCase())).length;
+        if (matchCount >= 2 && matchCount > bestMatchScore) {
+          bestMatchScore = matchCount;
           matchedClusterId = cluster.id;
-          break;
         }
       }
 
-      // Group by theme
+      // If matched to a cluster, also insert as a briefing_update
+      if (matchedClusterId) {
+        await upsertBriefingUpdate({
+          cluster_id: matchedClusterId,
+          title: item.title,
+          summary: item.summary,
+          source_name: source,
+          content_hash: item.content_hash,
+        });
+      }
+
+      // Group by theme for daily briefing
       let themeGroup = allItems.find(g => g.theme === item.theme);
       if (!themeGroup) {
         themeGroup = { theme: item.theme, items: [] };
@@ -193,7 +206,7 @@ async function syncBriefings() {
       themeGroup.items.push({
         title: item.title,
         summary: item.summary,
-        why_it_matters: '', // Could be AI-generated later
+        why_it_matters: '',
         sources: item.sources,
         cluster_id: matchedClusterId,
       });
@@ -202,7 +215,8 @@ async function syncBriefings() {
 
   if (allItems.length > 0) {
     await upsertDailyBriefing(allItems);
-    console.log(`\n✅ Briefing sync complete: ${allItems.reduce((s, g) => s + g.items.length, 0)} items across ${allItems.length} themes`);
+    const linkedCount = allItems.reduce((s, g) => s + g.items.filter(i => i.cluster_id).length, 0);
+    console.log(`\n✅ Briefing sync complete: ${allItems.reduce((s, g) => s + g.items.length, 0)} items, ${linkedCount} linked to clusters`);
   } else {
     console.log(`\n⚠ No briefing items scraped`);
   }
