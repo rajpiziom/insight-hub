@@ -103,15 +103,15 @@ serve(async (req) => {
       });
 
     } else if (action === "briefing" && userId) {
-      // Get recent articles (last 24h)
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Get recent articles — last 7 days by published_at OR recently imported
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const { data: articles } = await supabase
         .from("articles")
-        .select("title, source_name, body_text, topic_tags, published_at, canonical_url")
+        .select("title, source_name, body_text, topic_tags, published_at, canonical_url, imported_at")
         .eq("user_id", userId)
-        .gte("published_at", oneDayAgo)
-        .order("published_at", { ascending: false })
-        .limit(50);
+        .or(`published_at.gte.${sevenDaysAgo},imported_at.gte.${sevenDaysAgo}`)
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .limit(60);
 
       if (!articles || articles.length === 0) {
         return new Response(JSON.stringify({ success: true, result: JSON.stringify({ sections: [] }) }), {
@@ -119,8 +119,8 @@ serve(async (req) => {
         });
       }
 
-      systemPrompt += `\nGenerate a morning briefing from these articles. Group into themes (Markets, Macro, Technology, Geopolitics, Business, Policy, Energy, Other). For each item: title, summary (2-4 sentences), why_it_matters, sources (array of source names). Return JSON: { sections: [{ theme, items: [{ title, summary, why_it_matters, sources }] }] }`;
-      prompt = `Articles from the last 24 hours:\n\n${articles.map((a, i) => 
+      systemPrompt += `\nGenerate a morning briefing from these articles. Each article should become its own briefing item — do NOT merge or group articles together. For each article produce: title (concise headline), summary (2-4 sentences capturing the key facts), why_it_matters (1 sentence), sources (array with the source name). Group items by theme (Markets, Macro, Technology, Geopolitics, Business, Policy, Energy, Other). Return JSON: { sections: [{ theme, items: [{ title, summary, why_it_matters, sources }] }] }`;
+      prompt = `Articles (${articles.length} total):\n\n${articles.map((a, i) =>
         `[${i + 1}] "${a.title}" - ${a.source_name}\nTags: ${(a.topic_tags || []).join(', ')}\n${(a.body_text || '').substring(0, 600)}\n`
       ).join('\n')}`;
 
