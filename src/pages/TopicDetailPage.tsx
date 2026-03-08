@@ -179,14 +179,37 @@ export default function TopicDetailPage() {
               ) : (activeMode === 'explain' && explainText) ? (
                 <div className="prose prose-sm max-w-none">
                   {explainText.split('\n\n').map((p, i) => (
-                    <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">{p}</p>
+                    <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">
+                      <CitedText text={p} articleIndex={articleIndex} />
+                    </p>
                   ))}
                 </div>
               ) : (activeMode === 'updates' && updatesText) ? (
-                <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground/90">
-                  <ReactMarkdown>{updatesText}</ReactMarkdown>
+                <div className="space-y-1.5">
+                  {updatesText.split('\n').filter(l => l.trim()).map((line, i) => {
+                    const bullet = line.replace(/^[-*]\s*/, '');
+                    return (
+                      <div key={i} className="flex items-start gap-2 text-sm leading-relaxed text-foreground/90">
+                        <span className="text-muted-foreground mt-1 shrink-0">•</span>
+                        <span><CitedText text={bullet} articleIndex={articleIndex} /></span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : null}
+              {!loading && Object.keys(articleIndex).length > 0 && (
+                <div className="mt-4 pt-3 border-t border-border">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Sources</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(articleIndex).map(([num, art]) => (
+                      <Link key={num} to={`/articles/${art.id}`} className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                        <span className="text-[10px] font-medium text-primary bg-primary/10 rounded px-1 py-0.5">{num}</span>{' '}
+                        <span className="underline decoration-dotted">{art.title.length > 50 ? art.title.substring(0, 50) + '…' : art.title}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </div>
