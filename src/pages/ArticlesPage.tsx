@@ -46,6 +46,19 @@ export default function ArticlesPage() {
     },
   });
 
+  // Auto-tag untagged articles in the background
+  useEffect(() => {
+    if (taggedRef.current || articles.length === 0) return;
+    const untagged = articles.filter(a => !a.topic_tags || a.topic_tags.length === 0);
+    if (untagged.length === 0) return;
+    taggedRef.current = true;
+    supabase.functions.invoke('ai-analyze', { body: { action: 'tag-batch' } })
+      .then(({ data }) => {
+        if (data?.tagged > 0) queryClient.invalidateQueries({ queryKey: ['articles'] });
+      })
+      .catch(() => {});
+  }, [articles]);
+
   const allTopics = [...new Set(articles.flatMap(a => a.topic_tags || []))];
 
   const filtered = articles.filter(a => {
