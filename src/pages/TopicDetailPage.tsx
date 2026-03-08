@@ -1,5 +1,5 @@
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, BookOpen, LayoutList, Columns, Clock, Loader2, Sparkles, ChevronDown, ChevronUp, Newspaper, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
