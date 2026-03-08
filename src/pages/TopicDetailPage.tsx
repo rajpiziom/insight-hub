@@ -15,6 +15,30 @@ function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<number, { id: string; title: string }> }) {
+  // Split text by citation markers like [1], [2][3], etc.
+  const parts = text.split(/(\[\d+\])/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const match = part.match(/^\[(\d+)\]$/);
+        if (match) {
+          const num = parseInt(match[1]);
+          const article = articleIndex[num];
+          if (article) {
+            return (
+              <Link key={i} to={`/articles/${article.id}`} className="inline-flex items-center no-underline" title={article.title}>
+                <span className="text-[10px] font-medium text-primary bg-primary/10 rounded px-1 py-0.5 hover:bg-primary/20 transition-colors cursor-pointer">{num}</span>
+              </Link>
+            );
+          }
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
 export default function TopicDetailPage() {
   const { id } = useParams();
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
