@@ -1,12 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ExternalLink, Bookmark, CheckCircle, Sparkles, GitCompare, MessageSquare, Clock, User, Loader2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Bookmark, CheckCircle, Sparkles, Clock, User, Loader2 } from 'lucide-react';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { SentimentIndicator } from '@/components/ui/sentiment-indicator';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -15,6 +16,8 @@ function formatDate(dateStr: string) {
 export default function ArticleViewPage() {
   const { id } = useParams();
   const [showSummary, setShowSummary] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryData, setSummaryData] = useState<{ summary: string; key_takeaways?: string[]; why_it_matters?: string; implications?: string } | null>(null);
 
   const { data: article, isLoading } = useQuery({
     queryKey: ['article', id],
@@ -29,6 +32,37 @@ export default function ArticleViewPage() {
     },
     enabled: !!id,
   });
+
+  const handleSummarise = async () => {
+    if (summaryData) {
+      setShowSummary(!showSummary);
+      return;
+    }
+    setSummaryLoading(true);
+    setShowSummary(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-analyze', {
+        body: { action: 'summarize', articleId: id },
+      });
+      if (error) throw error;
+      
+      let parsed = null;
+      try {
+        const raw = typeof data.result === 'string' ? data.result : JSON.stringify(data.result);
+        // The tool call returns {result: "json string"} so try to parse nested
+        const outer = JSON.parse(raw);
+        parsed = outer.result ? JSON.parse(outer.result) : outer;
+      } catch {
+        parsed = { summary: data.result || 'No summary generated.' };
+      }
+      setSummaryData(parsed);
+    } catch (err: any) {
+      toast.error('Failed to generate summary: ' + (err.message || 'Unknown error'));
+      setShowSummary(false);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -74,8 +108,9 @@ export default function ArticleViewPage() {
           </div>
 
           <div className="flex flex-wrap gap-2 mb-8">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowSummary(!showSummary)}>
-              <Sparkles className="w-3.5 h-3.5" /> {showSummary ? 'Hide Summary' : 'Summarise'}
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSummarise} disabled={summaryLoading}>
+              {summaryLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {summaryLoading ? 'Summarising...' : showSummary ? 'Hide Summary' : 'Summarise'}
             </Button>
             <Button variant="outline" size="sm" className="gap-1.5"><Bookmark className="w-3.5 h-3.5" /> Save</Button>
             <Button variant="outline" size="sm" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Mark Read</Button>
@@ -83,6 +118,40 @@ export default function ArticleViewPage() {
               <Button variant="ghost" size="sm" className="gap-1.5"><ExternalLink className="w-3.5 h-3.5" /> Source</Button>
             </a>
           </div>
+
+          {showSummary && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mb-8 p-4 rounded-xl bg-muted/50 border border-border space-y-3">
+              {summaryLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Generating AI summary...
+                </div>
+              ) : summaryData ? (
+                <>
+                  <p className="text-sm leading-relaxed">{summaryData.summary}</p>
+                  {summaryData.key_takeaways && summaryData.key_takeaways.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Key Takeaways</h4>
+                      <ul className="list-disc list-inside text-sm space-y-1">
+                        {summaryData.key_takeaways.map((t, i) => <li key={i}>{t}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {summaryData.why_it_matters && (
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Why It Matters</h4>
+                      <p className="text-sm">{summaryData.why_it_matters}</p>
+                    </div>
+                  )}
+                  {summaryData.implications && (
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Implications</h4>
+                      <p className="text-sm">{summaryData.implications}</p>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </motion.div>
+          )}
 
           {article.hero_image_url && (
             <img src={article.hero_image_url} alt={article.title} className="w-full rounded-xl mb-8 object-cover max-h-96" />
