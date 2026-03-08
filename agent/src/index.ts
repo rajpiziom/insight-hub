@@ -189,22 +189,30 @@ program
         return;
       }
 
-      console.log(`Found ${articles.length} article(s) to re-extract:\n`);
+      console.log(`Found ${articles.length} article(s) to re-extract (5 at a time):\n`);
       let updated = 0;
+      const CONCURRENCY = 5;
 
-      for (const art of articles) {
-        try {
-          const extracted = await extractArticle(art.canonical_url);
-          if (extracted && extracted.body_text.length > (art.body_text_length || 0)) {
-            await updateArticleBody(art.id, extracted);
-            updated++;
-            console.log(`    ✓ Updated: "${art.title}" (${art.body_text_length} → ${extracted.body_text.length} chars)`);
-          } else {
-            console.log(`    ⊘ No improvement for: "${art.title}"`);
-          }
-          await new Promise(r => setTimeout(r, 1500));
-        } catch (err: any) {
-          console.error(`    ✗ Failed: ${err.message}`);
+      for (let i = 0; i < articles.length; i += CONCURRENCY) {
+        const batch = articles.slice(i, i + CONCURRENCY);
+        await Promise.allSettled(
+          batch.map(async (art) => {
+            try {
+              const extracted = await extractArticle(art.canonical_url);
+              if (extracted && extracted.body_text.length > (art.body_text_length || 0)) {
+                await updateArticleBody(art.id, extracted);
+                updated++;
+                console.log(`    ✓ Updated: "${art.title}" (${art.body_text_length} → ${extracted.body_text.length} chars)`);
+              } else {
+                console.log(`    ⊘ No improvement for: "${art.title}"`);
+              }
+            } catch (err: any) {
+              console.error(`    ✗ Failed: ${err.message}`);
+            }
+          })
+        );
+        if (i + CONCURRENCY < articles.length) {
+          await new Promise(r => setTimeout(r, 500));
         }
       }
 
