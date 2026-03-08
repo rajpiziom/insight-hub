@@ -1,4 +1,4 @@
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ExternalLink, Bookmark, CheckCircle, Sparkles, Clock, User, Loader2 } from 'lucide-react';
