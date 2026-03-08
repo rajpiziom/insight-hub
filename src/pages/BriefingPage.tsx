@@ -167,17 +167,25 @@ export default function BriefingPage() {
   const content: BriefingContent | null = briefing?.content ?? null;
   const sections = content?.sections ?? [];
 
+  // Enrich items with cluster_id from briefing_updates if not already set
+  const enrichItem = (item: any) => {
+    if (item.cluster_id) return item;
+    const summaryKey = item.summary?.slice(0, 60).toLowerCase();
+    const titleKey = item.title?.toLowerCase();
+    const clusterId = clusterMap[summaryKey] || clusterMap[titleKey];
+    if (clusterId) return { ...item, cluster_id: clusterId };
+    return item;
+  };
+
   // Group items by theme, filtering noise
   const groupedByTheme = sections
     .map(section => ({
       theme: section.theme,
-      items: section.items.filter(item =>
-        !isClientNoise(item.title) && !isClientNoise(item.summary)
-      ),
+      items: section.items
+        .filter(item => !isClientNoise(item.title) && !isClientNoise(item.summary))
+        .map(enrichItem),
     }))
     .filter(g => g.items.length > 0);
-
-  const totalItems = groupedByTheme.reduce((s, g) => s + g.items.length, 0);
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
