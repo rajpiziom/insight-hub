@@ -164,9 +164,19 @@ export default function ArticleViewPage() {
   }
 
   if (!article) {
+    return (
+      <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+        <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+        <p className="text-muted-foreground">Article not found.</p>
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* Floating back bar on scroll up */}
+      {/* Floating back bar — appears when scrolling up */}
       <motion.div
         initial={{ y: -60 }}
         animate={{ y: showBackBar ? 0 : -60 }}
@@ -176,28 +186,18 @@ export default function ArticleViewPage() {
         <button onClick={goBack} className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
-        <span className="text-xs text-muted-foreground truncate">{article?.title}</span>
+        <span className="text-xs text-muted-foreground truncate">{article.title}</span>
       </motion.div>
 
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-      <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="w-4 h-4" /> Back
-      </button>
-        <p className="text-muted-foreground">Article not found.</p>
-      </div>
-    );
-  }
+      <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+        <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
 
-  return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-      <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="w-4 h-4" /> Back
-      </button>
-
-      <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl overflow-hidden">
-        <div className="p-6 lg:p-8">
-          <div className="flex items-center gap-3 mb-4">
-            <SourceBadge name={article.source_name} />
+        <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="p-6 lg:p-8">
+            <div className="flex items-center gap-3 mb-4">
+              <SourceBadge name={article.source_name} />
             <SentimentIndicator sentiment={article.sentiment} />
           </div>
 
