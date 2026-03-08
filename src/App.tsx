@@ -11,6 +11,7 @@ import TopicsPage from "./pages/TopicsPage";
 import TopicDetailPage from "./pages/TopicDetailPage";
 import BriefingPage from "./pages/BriefingPage";
 import SourcesPage from "./pages/SourcesPage";
+import SourceDetailPage from "./pages/SourceDetailPage";
 import BookmarksPage from "./pages/BookmarksPage";
 import SearchPage from "./pages/SearchPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -44,6 +45,7 @@ const App = () => (
           <Route path="/topics/:id" element={<AppLayout><TopicDetailPage /></AppLayout>} />
           <Route path="/briefing" element={<AppLayout><BriefingPage /></AppLayout>} />
           <Route path="/sources" element={<AppLayout><SourcesPage /></AppLayout>} />
+          <Route path="/sources/:id" element={<AppLayout><SourceDetailPage /></AppLayout>} />
           <Route path="/bookmarks" element={<AppLayout><BookmarksPage /></AppLayout>} />
           <Route path="/search" element={<AppLayout><SearchPage /></AppLayout>} />
           <Route path="/settings" element={<AppLayout><SettingsPage /></AppLayout>} />
