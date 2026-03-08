@@ -176,7 +176,8 @@ export default function TopicDetailPage() {
                 });
                 if (error) throw error;
                 setUpdatesText(data.summary);
-                if (data.articleIndex) setArticleIndex(data.articleIndex);
+                if (data.articleIndex) setArticleIndex(prev => ({ ...prev, ...data.articleIndex }));
+                if (data.citationQuotes) setUpdatesQuotes(data.citationQuotes);
               } catch (err: any) {
                 toast.error(err.message || 'Failed');
                 setActiveMode(null);
