@@ -1,4 +1,4 @@
-import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ExternalLink, Bookmark, CheckCircle, Sparkles, Clock, User, Loader2 } from 'lucide-react';
@@ -65,7 +65,7 @@ export default function ArticleViewPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const highlightQuery = searchParams.get('highlight');
-  const navigate = useNavigate();
+  const goBack = () => window.history.back();
   const [showSummary, setShowSummary] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; key_takeaways?: string[]; why_it_matters?: string; implications?: string } | null>(null);
@@ -132,7 +132,7 @@ export default function ArticleViewPage() {
   if (!article) {
     return (
       <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+        <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <p className="text-muted-foreground">Article not found.</p>
@@ -142,7 +142,7 @@ export default function ArticleViewPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+      <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
 
