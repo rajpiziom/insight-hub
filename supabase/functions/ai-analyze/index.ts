@@ -171,6 +171,79 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, result: response }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    } else if (action === "tag" && articleId) {
+      const { data: article } = await supabase
+        .from("articles")
+        .select("id, title, subtitle, body_text, source_name, section")
+        .eq("id", articleId)
+        .single();
+      if (!article) throw new Error("Article not found");
+
+      systemPrompt = "You are a news topic classifier. Assign 1-4 concise topic tags to the article. Use short, consistent labels like: Geopolitics, AI & Technology, Energy, Markets, Trade, Climate, Defence, Healthcare, US Politics, Europe, Middle East, Asia, Latin America, Business, Science, Culture, Economics, Finance. Pick the most relevant ones.";
+      
+      const response = await callAI(LOVABLE_API_KEY, systemPrompt, 
+        `Title: ${article.title}\nSection: ${article.section || 'N/A'}\nSource: ${article.source_name}\n\n${(article.body_text || '').substring(0, 3000)}`, 
+        true
+      );
+
+      let tags: string[] = [];
+      try {
+        const parsed = JSON.parse(response);
+        const inner = parsed.result ? JSON.parse(parsed.result) : parsed;
+        tags = inner.tags || inner.topic_tags || (Array.isArray(inner) ? inner : []);
+      } catch {
+        tags = [];
+      }
+
+      if (tags.length > 0) {
+        await supabase.from("articles").update({ topic_tags: tags }).eq("id", articleId);
+      }
+
+      return new Response(JSON.stringify({ success: true, tags }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
+    } else if (action === "tag-batch") {
+      // Tag all untagged articles
+      const { data: untagged } = await supabase
+        .from("articles")
+        .select("id, title, subtitle, body_text, source_name, section")
+        .or("topic_tags.is.null,topic_tags.eq.{}")
+        .limit(20);
+
+      if (!untagged || untagged.length === 0) {
+        return new Response(JSON.stringify({ success: true, tagged: 0 }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Build a single prompt with all articles for efficiency
+      systemPrompt = "You are a news topic classifier. For each article, assign 1-4 concise topic tags. Use short consistent labels like: Geopolitics, AI & Technology, Energy, Markets, Trade, Climate, Defence, Healthcare, US Politics, Europe, Middle East, Asia, Latin America, Business, Science, Culture, Economics, Finance. Return a JSON array where each element has 'id' and 'tags'.";
+      
+      prompt = untagged.map(a => 
+        `[ID: ${a.id}] "${a.title}" (${a.source_name}, section: ${a.section || 'N/A'})\n${(a.body_text || '').substring(0, 800)}`
+      ).join('\n\n---\n\n');
+
+      const response = await callAI(LOVABLE_API_KEY, systemPrompt, prompt, true);
+
+      let results: { id: string; tags: string[] }[] = [];
+      try {
+        const parsed = JSON.parse(response);
+        const inner = parsed.result ? JSON.parse(parsed.result) : parsed;
+        results = inner.articles || inner.results || (Array.isArray(inner) ? inner : []);
+      } catch {}
+
+      let tagged = 0;
+      for (const item of results) {
+        if (item.id && item.tags && item.tags.length > 0) {
+          await supabase.from("articles").update({ topic_tags: item.tags }).eq("id", item.id);
+          tagged++;
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, tagged, total: untagged.length }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), {

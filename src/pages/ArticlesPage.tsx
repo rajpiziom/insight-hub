@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, ArrowRight, Bookmark, Loader2 } from 'lucide-react';
+import { Search, ArrowRight, Bookmark, Loader2, Tags } from 'lucide-react';
 import economistLogo from '@/assets/economist-logo.png';
 import { PageHeader } from '@/components/ui/page-header';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { SentimentIndicator } from '@/components/ui/sentiment-indicator';
-import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -17,6 +19,24 @@ export default function ArticlesPage() {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [topicFilter, setTopicFilter] = useState<string>('all');
+  const [tagging, setTagging] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleTagAll = async () => {
+    setTagging(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-analyze', {
+        body: { action: 'tag-batch' },
+      });
+      if (error) throw error;
+      toast.success(`Tagged ${data.tagged} of ${data.total} articles`);
+      queryClient.invalidateQueries({ queryKey: ['articles'] });
+    } catch (err: any) {
+      toast.error('Tagging failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setTagging(false);
+    }
+  };
 
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ['articles'],
@@ -75,6 +95,10 @@ export default function ArticlesPage() {
           <option value="all">All Topics</option>
           {allTopics.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleTagAll} disabled={tagging}>
+          {tagging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tags className="w-3.5 h-3.5" />}
+          {tagging ? 'Tagging...' : 'Auto-Tag All'}
+        </Button>
       </div>
 
       {isLoading ? (
