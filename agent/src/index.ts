@@ -169,19 +169,37 @@ async function syncBriefings() {
     if (items.length === 0) continue;
 
     for (const item of items) {
-      // Match to clusters using keywords + entities
+      // Match to clusters using keywords, entities, and title phrases
       let matchedClusterId: string | undefined;
       let bestMatchScore = 0;
-      const itemLower = item.summary.toLowerCase();
+      const itemLower = (item.title + ' ' + item.summary).toLowerCase();
 
       for (const cluster of clusters) {
-        const keywords = cluster.top_keywords || [];
-        const entities = cluster.top_entities || [];
-        const titleWords = (cluster.short_title || cluster.title).toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
-        const allTerms = [...keywords, ...entities, ...titleWords];
-        const matchCount = allTerms.filter(kw => itemLower.includes(kw.toLowerCase())).length;
-        if (matchCount >= 2 && matchCount > bestMatchScore) {
-          bestMatchScore = matchCount;
+        const keywords = (cluster.top_keywords || []).map((k: string) => k.toLowerCase());
+        const entities = (cluster.top_entities || []).map((e: string) => e.toLowerCase());
+        const clusterTitle = (cluster.short_title || cluster.title).toLowerCase();
+        const titleWords = clusterTitle.split(/\s+/).filter((w: string) => w.length > 3);
+
+        // Score: keyword/entity individual matches
+        let score = 0;
+        for (const kw of keywords) {
+          if (itemLower.includes(kw)) score += 1;
+        }
+        for (const ent of entities) {
+          if (itemLower.includes(ent)) score += 1.5; // entities are stronger signals
+        }
+        for (const tw of titleWords) {
+          if (itemLower.includes(tw)) score += 0.5;
+        }
+
+        // Bonus: if cluster title appears as a phrase (partial)
+        const titleParts = clusterTitle.split(/[:\-–—,]/).map((p: string) => p.trim()).filter((p: string) => p.length > 5);
+        for (const part of titleParts) {
+          if (itemLower.includes(part)) score += 3;
+        }
+
+        if (score >= 1.5 && score > bestMatchScore) {
+          bestMatchScore = score;
           matchedClusterId = cluster.id;
         }
       }
