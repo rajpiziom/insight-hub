@@ -23,7 +23,7 @@ const item = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
 export default function Dashboard() {
   const todayBriefing = mockBriefing;
-  const recentArticles = [...mockArticles].sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime()).slice(0, 5);
+  const recentArticles = [...mockArticles].sort((a, b) => new Date(b.published_at || '').getTime() - new Date(a.published_at || '').getTime()).slice(0, 5);
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -47,16 +47,16 @@ export default function Dashboard() {
           <span className="text-xs text-muted-foreground">March 8, 2026</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {todayBriefing.sections.map((section) =>
+          {todayBriefing.content.sections.map((section) =>
             section.items.map((briefItem, i) => (
               <motion.div
-                key={`${section.category}-${i}`}
+                key={`${section.theme}-${i}`}
                 variants={item}
                 className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 transition-colors group"
               >
                 <div className="flex items-center gap-2 mb-3">
-                  <span className={cn('px-2 py-0.5 rounded text-xs font-semibold', categoryColors[section.category] || categoryColors.Other)}>
-                    {section.category}
+                  <span className={cn('px-2 py-0.5 rounded text-xs font-semibold', categoryColors[section.theme] || categoryColors.Other)}>
+                    {section.theme}
                   </span>
                 </div>
                 <h3 className="font-display font-semibold text-sm mb-2 group-hover:text-primary transition-colors">{briefItem.title}</h3>
@@ -77,7 +77,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-primary" />
-            <h2 className="font-display font-semibold text-lg">Active Topics</h2>
+            <h2 className="font-display font-semibold text-lg">Active Events</h2>
           </div>
           <Link to="/topics">
             <Button variant="ghost" size="sm" className="gap-1 text-xs">
@@ -91,19 +91,26 @@ export default function Dashboard() {
               <Link to={`/topics/${cluster.id}`}>
                 <div className="bg-card border border-border rounded-xl p-5 hover:border-primary/30 transition-all group cursor-pointer">
                   <div className="flex items-start justify-between mb-3">
-                    <h3 className="font-display font-semibold text-sm group-hover:text-primary transition-colors flex-1">{cluster.title}</h3>
-                    <span className="text-xs text-muted-foreground ml-2 shrink-0">{formatTime(cluster.latest_update)}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={cn('w-2 h-2 rounded-full', cluster.status === 'active' ? 'bg-success' : cluster.status === 'developing' ? 'bg-warning' : 'bg-muted-foreground')} />
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{cluster.status}</span>
+                      </div>
+                      <h3 className="font-display font-semibold text-sm group-hover:text-primary transition-colors">{cluster.title}</h3>
+                    </div>
+                    <span className="text-xs text-muted-foreground ml-2 shrink-0">{formatTime(cluster.last_updated_at)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mb-3">{cluster.overview}</p>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      {cluster.sources.map((s) => (
-                        <SourceBadge key={s} name={s} />
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {cluster.top_entities.slice(0, 3).map(e => (
+                        <span key={e} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">{e}</span>
                       ))}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{cluster.source_count} sources</span>
                       <BookOpen className="w-3 h-3" />
-                      {cluster.article_count} articles
+                      <span>{cluster.article_count}</span>
                     </div>
                   </div>
                 </div>
@@ -121,9 +128,7 @@ export default function Dashboard() {
             <h2 className="font-display font-semibold text-lg">Recent Articles</h2>
           </div>
           <Link to="/articles">
-            <Button variant="ghost" size="sm" className="gap-1 text-xs">
-              View All <ArrowRight className="w-3 h-3" />
-            </Button>
+            <Button variant="ghost" size="sm" className="gap-1 text-xs">View All <ArrowRight className="w-3 h-3" /></Button>
           </Link>
         </div>
         <motion.div variants={container} initial="hidden" animate="show" className="space-y-2">
@@ -134,7 +139,7 @@ export default function Dashboard() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <SourceBadge name={article.source_name} />
-                      <span className="text-xs text-muted-foreground">{formatTime(article.published_at)}</span>
+                      <span className="text-xs text-muted-foreground">{formatTime(article.published_at || '')}</span>
                       <SentimentIndicator sentiment={article.sentiment} showLabel={false} />
                     </div>
                     <h3 className="font-medium text-sm group-hover:text-primary transition-colors truncate">{article.title}</h3>

@@ -1,1 +1,13 @@
 project_id = "dhotjrblrzfkttpomlzl"
+
+[functions.chat]
+verify_jwt = false
+
+[functions.ai-analyze]
+verify_jwt = false
+
+[functions.ingest-rss]
+verify_jwt = false
+
+[functions.ingest-url]
+verify_jwt = false
