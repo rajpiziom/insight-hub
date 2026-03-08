@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, BookOpen, LayoutList, Columns, Clock, Loader2, Sparkles } from 'lucide-react';
@@ -16,11 +16,12 @@ function formatTime(dateStr: string) {
 }
 
 // CitedText renders inline citation markers as links to the specific passage in the article
-function CitedText({ text, articleIndex, citationQuotes, citationOffset }: { 
+function CitedText({ text, articleIndex, citationQuotes, citationOffset, fromPath }: { 
   text: string; 
   articleIndex: Record<number, { id: string; title: string }>; 
   citationQuotes: { num: number; quote: string }[];
   citationOffset: number;
+  fromPath: string;
 }) {
   const parts = text.split(/(\[\d+\])/g);
   let localIdx = 0;
@@ -36,7 +37,7 @@ function CitedText({ text, articleIndex, citationQuotes, citationOffset }: {
           if (article) {
             const highlightParam = quoteEntry?.quote ? `?highlight=${encodeURIComponent(quoteEntry.quote)}` : '';
             return (
-              <Link key={i} to={`/articles/${article.id}${highlightParam}`} className="inline-flex items-center no-underline" title={quoteEntry?.quote || article.title}>
+              <Link key={i} to={`/articles/${article.id}${highlightParam}`} state={{ from: fromPath }} className="inline-flex items-center no-underline" title={quoteEntry?.quote || article.title}>
                 <span className="text-[10px] font-medium text-primary bg-primary/10 rounded px-1 py-0.5 hover:bg-primary/20 transition-colors cursor-pointer">{num}</span>
               </Link>
             );
@@ -55,7 +56,9 @@ function countCitations(text: string): number {
 
 export default function TopicDetailPage() {
   const { id } = useParams();
+  const location = useLocation();
   const goBack = () => window.history.back();
+  const currentPath = location.pathname;
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
   const [activeMode, setActiveMode] = useState<'explain' | 'updates' | null>(null);
   const [loading, setLoading] = useState(false);
@@ -203,7 +206,7 @@ export default function TopicDetailPage() {
                     return paragraphs.map((p, i) => {
                       const el = (
                         <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">
-                          <CitedText text={p} articleIndex={articleIndex} citationQuotes={explainQuotes} citationOffset={offset} />
+                          <CitedText text={p} articleIndex={articleIndex} citationQuotes={explainQuotes} citationOffset={offset} fromPath={currentPath} />
                         </p>
                       );
                       offset += countCitations(p);
@@ -221,7 +224,7 @@ export default function TopicDetailPage() {
                       const el = (
                         <div key={i} className="flex items-start gap-2 text-sm leading-relaxed text-foreground/90">
                           <span className="text-muted-foreground mt-1 shrink-0">•</span>
-                          <span><CitedText text={bullet} articleIndex={articleIndex} citationQuotes={updatesQuotes} citationOffset={offset} /></span>
+                          <span><CitedText text={bullet} articleIndex={articleIndex} citationQuotes={updatesQuotes} citationOffset={offset} fromPath={currentPath} /></span>
                         </div>
                       );
                       offset += countCitations(bullet);

@@ -1,4 +1,4 @@
-import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { useParams, Link, useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, ExternalLink, Bookmark, CheckCircle, Sparkles, Clock, User, Loader2 } from 'lucide-react';
@@ -65,7 +65,16 @@ export default function ArticleViewPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const highlightQuery = searchParams.get('highlight');
-  const goBack = () => window.history.back();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const goBack = () => {
+    const from = (location.state as any)?.from;
+    if (from) {
+      navigate(from);
+    } else {
+      navigate('/articles');
+    }
+  };
   const [showSummary, setShowSummary] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; key_takeaways?: string[]; why_it_matters?: string; implications?: string } | null>(null);
