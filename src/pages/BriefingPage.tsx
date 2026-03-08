@@ -120,31 +120,21 @@ export default function BriefingPage() {
     }
   };
 
-  const [clusterMap, setClusterMap] = useState<Record<string, string>>({}); // title snippet -> cluster_id
+  const [clusters, setClusters] = useState<any[]>([]);
 
-  const loadBriefingUpdates = async () => {
+  const loadClusters = async () => {
     try {
       const { data } = await supabase
-        .from('briefing_updates')
-        .select('title, summary, cluster_id')
-        .not('cluster_id', 'is', null);
-      if (data) {
-        const map: Record<string, string> = {};
-        for (const u of data) {
-          if (u.cluster_id) {
-            // Index by first 60 chars of summary for matching
-            map[u.summary.slice(0, 60).toLowerCase()] = u.cluster_id;
-            map[u.title.toLowerCase()] = u.cluster_id;
-          }
-        }
-        setClusterMap(map);
-      }
+        .from('event_clusters')
+        .select('id, title, short_title, top_keywords, top_entities')
+        .in('status', ['active', 'developing']);
+      if (data) setClusters(data);
     } catch {}
   };
 
   useEffect(() => {
     loadBriefing();
-    loadBriefingUpdates();
+    loadClusters();
   }, []);
 
   const handleRegenerate = async () => {
@@ -167,13 +157,40 @@ export default function BriefingPage() {
   const content: BriefingContent | null = briefing?.content ?? null;
   const sections = content?.sections ?? [];
 
-  // Enrich items with cluster_id from briefing_updates if not already set
+  // Match a briefing item to a cluster using keyword/entity overlap
+  const matchToCluster = (item: any): string | undefined => {
+    if (item.cluster_id) return item.cluster_id;
+    const text = ((item.title || '') + ' ' + (item.summary || '')).toLowerCase();
+    let bestId: string | undefined;
+    let bestScore = 0;
+
+    for (const cluster of clusters) {
+      let score = 0;
+      const keywords = (cluster.top_keywords || []) as string[];
+      const entities = (cluster.top_entities || []) as string[];
+      const clusterTitle = ((cluster.short_title || cluster.title) as string).toLowerCase();
+      const titleWords = clusterTitle.split(/\s+/).filter((w: string) => w.length > 3);
+
+      for (const kw of keywords) { if (text.includes(kw.toLowerCase())) score += 1; }
+      for (const ent of entities) { if (text.includes(ent.toLowerCase())) score += 1.5; }
+      for (const tw of titleWords) { if (text.includes(tw)) score += 0.5; }
+
+      // Bonus for cluster title phrase match
+      const titleParts = clusterTitle.split(/[:\-–—,]/).map((p: string) => p.trim()).filter((p: string) => p.length > 5);
+      for (const part of titleParts) { if (text.includes(part)) score += 3; }
+
+      if (score >= 1.5 && score > bestScore) {
+        bestScore = score;
+        bestId = cluster.id;
+      }
+    }
+    return bestId;
+  };
+
+  // Enrich items with cluster_id via live matching
   const enrichItem = (item: any) => {
-    if (item.cluster_id) return item;
-    const summaryKey = item.summary?.slice(0, 60).toLowerCase();
-    const titleKey = item.title?.toLowerCase();
-    const clusterId = clusterMap[summaryKey] || clusterMap[titleKey];
-    if (clusterId) return { ...item, cluster_id: clusterId };
+    const clusterId = matchToCluster(item);
+    if (clusterId && clusterId !== item.cluster_id) return { ...item, cluster_id: clusterId };
     return item;
   };
 
