@@ -145,7 +145,7 @@ export default function SourcesPage() {
               <div className="space-y-2">
                 {premiumSources.map((source, i) => {
                   const Icon = typeIcons[source.source_type] || Globe;
-                  const autoSync = (source as any).auto_sync_enabled ?? false;
+                  const autoSync = source.auto_sync_enabled ?? false;
                   return (
                     <motion.div
                       key={source.id}

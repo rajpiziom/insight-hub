@@ -1,26 +1,15 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Rss, Globe, Upload, Monitor, FileText, Chrome, Check, ChevronRight, ExternalLink, AlertCircle } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Monitor, Check, ChevronRight, AlertCircle, Terminal, Copy, CheckCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { premiumSourceTemplates, syncFrequencyLabels, type PremiumSourceTemplate, type SyncFrequency } from '@/types/discovery';
-import { sourceTypeLabels, type SourceType } from '@/types';
 import { createSource } from '@/lib/api';
 import { createDiscoveryEndpoint, updateSourceDiscoveryScope } from '@/lib/discovery-api';
 import { toast } from 'sonner';
-
-const sourceTypeOptions: { type: SourceType; icon: React.ElementType; description: string }[] = [
-  { type: 'rss_connector', icon: Rss, description: 'Subscribe to an RSS/Atom feed' },
-  { type: 'manual_url_import', icon: Upload, description: 'Paste article URLs manually' },
-  { type: 'browser_session_connector', icon: Monitor, description: 'Premium sources via authenticated browser session' },
-  { type: 'api_connector', icon: Globe, description: 'Connect via official API' },
-  { type: 'local_desktop_agent', icon: FileText, description: 'Local desktop agent (coming soon)' },
-  { type: 'web_extension_connector', icon: Chrome, description: 'Browser extension (coming soon)' },
-];
 
 interface AddSourceDialogProps {
   open: boolean;
@@ -28,29 +17,27 @@ interface AddSourceDialogProps {
   onSourceAdded: () => void;
 }
 
-type Step = 'type' | 'premium-select' | 'premium-configure' | 'rss' | 'manual';
+type Step = 'select-source' | 'configure' | 'setup-agent';
 
 export function AddSourceDialog({ open, onOpenChange, onSourceAdded }: AddSourceDialogProps) {
-  const [step, setStep] = useState<Step>('type');
-  const [selectedType, setSelectedType] = useState<SourceType | null>(null);
+  const [step, setStep] = useState<Step>('select-source');
   const [selectedTemplate, setSelectedTemplate] = useState<PremiumSourceTemplate | null>(null);
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [syncFrequency, setSyncFrequency] = useState<SyncFrequency>('6h');
   const [autoSync, setAutoSync] = useState(true);
-  const [rssUrl, setRssUrl] = useState('');
-  const [rssName, setRssName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [createdSourceId, setCreatedSourceId] = useState<string | null>(null);
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
 
   const resetState = () => {
-    setStep('type');
-    setSelectedType(null);
+    setStep('select-source');
     setSelectedTemplate(null);
     setSelectedSections([]);
     setSyncFrequency('6h');
     setAutoSync(true);
-    setRssUrl('');
-    setRssName('');
     setLoading(false);
+    setCreatedSourceId(null);
+    setCopiedCommand(null);
   };
 
   const handleClose = () => {
@@ -58,24 +45,11 @@ export function AddSourceDialog({ open, onOpenChange, onSourceAdded }: AddSource
     setTimeout(resetState, 200);
   };
 
-  const handleTypeSelect = (type: SourceType) => {
-    setSelectedType(type);
-    if (type === 'browser_session_connector') {
-      setStep('premium-select');
-    } else if (type === 'rss_connector') {
-      setStep('rss');
-    } else if (type === 'manual_url_import') {
-      setStep('manual');
-    } else {
-      toast.info('This connector type is coming soon');
-    }
-  };
-
   const handleTemplateSelect = (template: PremiumSourceTemplate) => {
     setSelectedTemplate(template);
-    setSelectedSections(template.sections.slice(0, 3).map(s => s.url));
+    setSelectedSections(template.sections.map(s => s.url));
     setSyncFrequency(template.defaultSyncFrequency);
-    setStep('premium-configure');
+    setStep('configure');
   };
 
   const toggleSection = (url: string) => {
@@ -84,26 +58,25 @@ export function AddSourceDialog({ open, onOpenChange, onSourceAdded }: AddSource
     );
   };
 
-  const handleCreatePremiumSource = async () => {
+  const handleCreateSource = async () => {
     if (!selectedTemplate) return;
     setLoading(true);
     try {
       const source = await createSource({
         source_name: selectedTemplate.name,
         source_domain: selectedTemplate.domain,
-        source_type: 'browser_session_connector',
-        auth_method: 'browser_session',
+        source_type: 'local_desktop_agent',
+        auth_method: 'local_agent',
         sync_frequency: syncFrequency,
+        auto_sync_enabled: autoSync,
         status: 'needs_attention',
         is_active: true,
         connector_settings: { template_id: selectedTemplate.id },
       });
 
-      // Update discovery scope
       const scope = selectedTemplate.sections.filter(s => selectedSections.includes(s.url));
       await updateSourceDiscoveryScope(source.id, scope);
 
-      // Create discovery endpoints
       for (const section of scope) {
         await createDiscoveryEndpoint({
           source_id: source.id,
@@ -113,9 +86,9 @@ export function AddSourceDialog({ open, onOpenChange, onSourceAdded }: AddSource
         });
       }
 
+      setCreatedSourceId(source.id);
+      setStep('setup-agent');
       toast.success(`${selectedTemplate.name} source created`);
-      onSourceAdded();
-      handleClose();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create source');
     } finally {
@@ -123,79 +96,58 @@ export function AddSourceDialog({ open, onOpenChange, onSourceAdded }: AddSource
     }
   };
 
-  const handleCreateRssSource = async () => {
-    if (!rssUrl.trim()) return;
-    setLoading(true);
-    try {
-      await createSource({
-        source_name: rssName || new URL(rssUrl).hostname,
-        source_domain: new URL(rssUrl).hostname,
-        source_type: 'rss_connector',
-        auth_method: 'rss',
-        sync_frequency: '1h',
-        status: 'connected',
-        is_active: true,
-        connector_settings: { feed_url: rssUrl },
-      });
-      toast.success('RSS source added');
-      onSourceAdded();
-      handleClose();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to create source');
-    } finally {
-      setLoading(false);
-    }
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedCommand(id);
+    setTimeout(() => setCopiedCommand(null), 2000);
   };
+
+  const CopyButton = ({ text, id }: { text: string; id: string }) => (
+    <button
+      onClick={() => copyToClipboard(text, id)}
+      className="absolute top-2 right-2 p-1.5 rounded-md bg-muted/80 hover:bg-muted transition-colors"
+      title="Copy"
+    >
+      {copiedCommand === id ? (
+        <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+      ) : (
+        <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+      )}
+    </button>
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="font-display">
-            {step === 'type' && 'Add Source'}
-            {step === 'premium-select' && 'Select Premium Source'}
-            {step === 'premium-configure' && `Configure ${selectedTemplate?.name}`}
-            {step === 'rss' && 'Add RSS Feed'}
-            {step === 'manual' && 'Manual Import'}
+            {step === 'select-source' && 'Add Source'}
+            {step === 'configure' && `Configure ${selectedTemplate?.name}`}
+            {step === 'setup-agent' && 'Set Up Desktop Agent'}
           </DialogTitle>
+          <DialogDescription>
+            {step === 'select-source' && 'Choose a premium source to connect via local desktop agent.'}
+            {step === 'configure' && 'Select sections to monitor and sync settings.'}
+            {step === 'setup-agent' && 'Run the agent on your machine to start syncing articles.'}
+          </DialogDescription>
         </DialogHeader>
 
         <AnimatePresence mode="wait">
-          {step === 'type' && (
+          {/* Step 1: Select source */}
+          {step === 'select-source' && (
             <motion.div
-              key="type"
+              key="select-source"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="grid grid-cols-2 gap-3 py-4"
+              className="space-y-3 py-2"
             >
-              {sourceTypeOptions.map(({ type, icon: Icon, description }) => (
-                <button
-                  key={type}
-                  onClick={() => handleTypeSelect(type)}
-                  className="flex flex-col items-start gap-2 p-4 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-colors text-left"
-                >
-                  <Icon className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="font-medium text-sm">{sourceTypeLabels[type]}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
-                  </div>
-                </button>
-              ))}
-            </motion.div>
-          )}
-
-          {step === 'premium-select' && (
-            <motion.div
-              key="premium-select"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-3 py-4"
-            >
-              <p className="text-sm text-muted-foreground">
-                Connect a premium news source using your existing subscription via browser session.
-              </p>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <Monitor className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <p className="text-sm text-muted-foreground">
+                  The desktop agent runs on your machine and uses your Edge browser session to access premium articles. No passwords are stored in the cloud.
+                </p>
+              </div>
               <div className="space-y-2">
                 {premiumSourceTemplates.map(template => (
                   <button
@@ -205,45 +157,31 @@ export function AddSourceDialog({ open, onOpenChange, onSourceAdded }: AddSource
                   >
                     <div className="text-left">
                       <p className="font-medium">{template.name}</p>
-                      <p className="text-xs text-muted-foreground">{template.domain}</p>
+                      <p className="text-xs text-muted-foreground">{template.description}</p>
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </button>
                 ))}
               </div>
-              <Button variant="ghost" onClick={() => setStep('type')} className="w-full mt-2">
-                Back
-              </Button>
             </motion.div>
           )}
 
-          {step === 'premium-configure' && selectedTemplate && (
+          {/* Step 2: Configure sections & sync */}
+          {step === 'configure' && selectedTemplate && (
             <motion.div
-              key="premium-configure"
+              key="configure"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-5 py-4"
+              className="space-y-5 py-2"
             >
-              {/* Connection notice */}
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-warning/10 border border-warning/30">
-                <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-medium text-warning">Browser Session Required</p>
-                  <p className="text-muted-foreground mt-1">
-                    After creating this source, you'll need to connect it using a local browser extension or desktop agent that has access to your authenticated {selectedTemplate.name} session.
-                  </p>
-                </div>
-              </div>
-
-              {/* Section selection */}
               <div className="space-y-2">
                 <Label>Sections to monitor</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {selectedTemplate.sections.map(section => (
                     <label
                       key={section.url}
-                      className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 cursor-pointer"
+                      className="flex items-center gap-2 p-2.5 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors"
                     >
                       <Checkbox
                         checked={selectedSections.includes(section.url)}
@@ -255,7 +193,6 @@ export function AddSourceDialog({ open, onOpenChange, onSourceAdded }: AddSource
                 </div>
               </div>
 
-              {/* Sync frequency */}
               <div className="space-y-2">
                 <Label>Sync frequency</Label>
                 <Select value={syncFrequency} onValueChange={v => setSyncFrequency(v as SyncFrequency)}>
@@ -270,83 +207,110 @@ export function AddSourceDialog({ open, onOpenChange, onSourceAdded }: AddSource
                 </Select>
               </div>
 
-              {/* Auto-sync toggle */}
               <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer">
-                <Checkbox
-                  checked={autoSync}
-                  onCheckedChange={v => setAutoSync(!!v)}
-                />
+                <Checkbox checked={autoSync} onCheckedChange={v => setAutoSync(!!v)} />
                 <div>
                   <p className="text-sm font-medium">Enable auto-sync</p>
-                  <p className="text-xs text-muted-foreground">Automatically discover and import new articles</p>
+                  <p className="text-xs text-muted-foreground">Agent will automatically discover and import new articles on schedule</p>
                 </div>
               </label>
 
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" onClick={() => setStep('premium-select')} className="flex-1">
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" onClick={() => setStep('select-source')} className="flex-1">
                   Back
                 </Button>
                 <Button
-                  onClick={handleCreatePremiumSource}
+                  onClick={handleCreateSource}
                   disabled={loading || selectedSections.length === 0}
                   className="flex-1"
                 >
-                  {loading ? 'Creating...' : 'Create Source'}
+                  {loading ? 'Creating...' : 'Create Source & Set Up Agent'}
                 </Button>
               </div>
             </motion.div>
           )}
 
-          {step === 'rss' && (
+          {/* Step 3: Agent setup instructions */}
+          {step === 'setup-agent' && selectedTemplate && (
             <motion.div
-              key="rss"
+              key="setup-agent"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="space-y-4 py-4"
+              className="space-y-4 py-2"
             >
-              <div className="space-y-2">
-                <Label htmlFor="rss-url">Feed URL</Label>
-                <Input
-                  id="rss-url"
-                  placeholder="https://example.com/rss.xml"
-                  value={rssUrl}
-                  onChange={e => setRssUrl(e.target.value)}
-                />
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                <CheckCircle className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-green-400">{selectedTemplate.name} source created</p>
+                  <p className="text-muted-foreground mt-1">
+                    Now set up the desktop agent on your machine to start pulling articles.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="rss-name">Source Name (optional)</Label>
-                <Input
-                  id="rss-name"
-                  placeholder="My News Source"
-                  value={rssName}
-                  onChange={e => setRssName(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" onClick={() => setStep('type')} className="flex-1">
-                  Back
-                </Button>
-                <Button onClick={handleCreateRssSource} disabled={loading || !rssUrl.trim()} className="flex-1">
-                  {loading ? 'Adding...' : 'Add Feed'}
-                </Button>
-              </div>
-            </motion.div>
-          )}
 
-          {step === 'manual' && (
-            <motion.div
-              key="manual"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4 py-4"
-            >
-              <p className="text-sm text-muted-foreground">
-                You can import individual articles from the Articles page using the "Import URL" button.
-              </p>
-              <Button variant="outline" onClick={() => setStep('type')} className="w-full">
-                Back
+              {/* Prerequisites */}
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Prerequisites</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary" />
+                    Node.js 18+ installed
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary" />
+                    Logged into <span className="text-foreground font-medium">{selectedTemplate.domain}</span> in Microsoft Edge
+                  </li>
+                </ul>
+              </div>
+
+              {/* Setup steps */}
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Setup</p>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">1. Install the agent</p>
+                  <div className="relative">
+                    <pre className="bg-muted/50 border border-border rounded-lg p-3 pr-10 text-xs font-mono overflow-x-auto">
+                      <code>{`cd agent\nnpm install\nnpx playwright install chromium`}</code>
+                    </pre>
+                    <CopyButton text="cd agent && npm install && npx playwright install chromium" id="install" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">2. Configure</p>
+                  <div className="relative">
+                    <pre className="bg-muted/50 border border-border rounded-lg p-3 pr-10 text-xs font-mono overflow-x-auto">
+                      <code>{`cp .env.example .env\n# Credentials are pre-filled for this app`}</code>
+                    </pre>
+                    <CopyButton text="cp .env.example .env" id="config" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">3. Close Edge, then run</p>
+                  <div className="relative">
+                    <pre className="bg-muted/50 border border-border rounded-lg p-3 pr-10 text-xs font-mono overflow-x-auto">
+                      <code>{`npm start sync`}</code>
+                    </pre>
+                    <CopyButton text="npm start sync" id="sync" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Or run continuously: <code className="bg-muted/50 px-1.5 py-0.5 rounded text-primary">npm start daemon</code>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border">
+                <Terminal className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  The agent uses your Edge browser profile to access {selectedTemplate.name} with your subscription. Edge must be closed while the agent runs. No passwords leave your machine.
+                </p>
+              </div>
+
+              <Button onClick={() => { onSourceAdded(); handleClose(); }} className="w-full">
+                Done
               </Button>
             </motion.div>
           )}

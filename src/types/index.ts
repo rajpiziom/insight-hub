@@ -22,6 +22,8 @@ export interface Source {
   auth_method: SourceAuthMethod;
   connector_settings: Record<string, any>;
   article_count: number;
+  auto_sync_enabled: boolean;
+  discovery_scope: { label: string; url: string }[] | null;
   created_at: string;
   updated_at: string;
 }
