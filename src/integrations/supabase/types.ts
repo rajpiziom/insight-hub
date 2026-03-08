@@ -384,6 +384,56 @@ export type Database = {
           },
         ]
       }
+      connector_sync_runs: {
+        Row: {
+          articles_imported: number | null
+          completed_at: string | null
+          created_at: string
+          errors: Json | null
+          id: string
+          source_id: string
+          started_at: string
+          status: string
+          urls_discovered: number | null
+          urls_new: number | null
+          user_id: string
+        }
+        Insert: {
+          articles_imported?: number | null
+          completed_at?: string | null
+          created_at?: string
+          errors?: Json | null
+          id?: string
+          source_id: string
+          started_at?: string
+          status?: string
+          urls_discovered?: number | null
+          urls_new?: number | null
+          user_id: string
+        }
+        Update: {
+          articles_imported?: number | null
+          completed_at?: string | null
+          created_at?: string
+          errors?: Json | null
+          id?: string
+          source_id?: string
+          started_at?: string
+          status?: string
+          urls_discovered?: number | null
+          urls_new?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connector_sync_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_briefings: {
         Row: {
           content: Json
@@ -410,6 +460,54 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      discovered_urls: {
+        Row: {
+          article_id: string | null
+          discovered_at: string
+          id: string
+          ingested: boolean
+          source_id: string
+          title: string | null
+          url: string
+          user_id: string
+        }
+        Insert: {
+          article_id?: string | null
+          discovered_at?: string
+          id?: string
+          ingested?: boolean
+          source_id: string
+          title?: string | null
+          url: string
+          user_id: string
+        }
+        Update: {
+          article_id?: string | null
+          discovered_at?: string
+          id?: string
+          ingested?: boolean
+          source_id?: string
+          title?: string | null
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovered_urls_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovered_urls_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       embeddings: {
         Row: {
@@ -774,12 +872,55 @@ export type Database = {
           },
         ]
       }
+      source_discovery_endpoints: {
+        Row: {
+          created_at: string
+          endpoint_url: string
+          id: string
+          is_active: boolean
+          label: string
+          last_checked_at: string | null
+          source_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint_url: string
+          id?: string
+          is_active?: boolean
+          label: string
+          last_checked_at?: string | null
+          source_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          endpoint_url?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          last_checked_at?: string | null
+          source_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_discovery_endpoints_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sources: {
         Row: {
           article_count: number
           auth_method: Database["public"]["Enums"]["source_auth_method"]
+          auto_sync_enabled: boolean
           connector_settings: Json | null
           created_at: string
+          discovery_scope: Json | null
           id: string
           is_active: boolean
           last_successful_sync_at: string | null
@@ -796,8 +937,10 @@ export type Database = {
         Insert: {
           article_count?: number
           auth_method?: Database["public"]["Enums"]["source_auth_method"]
+          auto_sync_enabled?: boolean
           connector_settings?: Json | null
           created_at?: string
+          discovery_scope?: Json | null
           id?: string
           is_active?: boolean
           last_successful_sync_at?: string | null
@@ -814,8 +957,10 @@ export type Database = {
         Update: {
           article_count?: number
           auth_method?: Database["public"]["Enums"]["source_auth_method"]
+          auto_sync_enabled?: boolean
           connector_settings?: Json | null
           created_at?: string
+          discovery_scope?: Json | null
           id?: string
           is_active?: boolean
           last_successful_sync_at?: string | null
