@@ -114,9 +114,9 @@ export default function TopicDetailPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <Link to="/topics" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="w-4 h-4" /> Back to Topics
-      </Link>
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+        <ArrowLeft className="w-4 h-4" /> Back
+      </button>
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <div className="bg-card border border-border rounded-2xl p-6 lg:p-8 mb-6">
