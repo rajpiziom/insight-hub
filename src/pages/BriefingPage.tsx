@@ -154,7 +154,20 @@ export default function BriefingPage() {
     ? (Date.now() - new Date(briefing.generated_at).getTime()) < 24 * 60 * 60 * 1000
     : false;
 
-  const content: BriefingContent | null = briefing?.content ?? null;
+  // Handle nested "result" wrapper from tool-calling AI responses
+  const rawContent = briefing?.content ?? null;
+  const content: BriefingContent | null = (() => {
+    if (!rawContent) return null;
+    // If content has a "result" key (stringified JSON), unwrap it
+    if ((rawContent as any).result && typeof (rawContent as any).result === 'string') {
+      try {
+        return JSON.parse((rawContent as any).result) as BriefingContent;
+      } catch {
+        return null;
+      }
+    }
+    return rawContent as BriefingContent;
+  })();
   const sections = content?.sections ?? [];
 
   // Match a briefing item to a cluster using keyword/entity overlap

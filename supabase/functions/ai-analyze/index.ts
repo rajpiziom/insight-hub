@@ -126,12 +126,21 @@ serve(async (req) => {
 
       const response = await callAI(LOVABLE_API_KEY, systemPrompt, prompt, true);
 
-      // Store briefing
+      // Store briefing — unwrap the tool-call "result" wrapper if present
       const today = new Date().toISOString().split('T')[0];
+      let briefingContent: any;
+      try {
+        const parsed = JSON.parse(response);
+        // callAI with jsonMode returns {result: "..."} from tool calling
+        const inner = parsed.result ? JSON.parse(parsed.result) : parsed;
+        briefingContent = inner;
+      } catch {
+        briefingContent = { sections: [] };
+      }
       await supabase.from("daily_briefings").upsert({
         user_id: userId,
         date: today,
-        content: JSON.parse(response),
+        content: briefingContent,
       }, { onConflict: 'user_id,date' });
 
       return new Response(JSON.stringify({ success: true, result: response }), {
