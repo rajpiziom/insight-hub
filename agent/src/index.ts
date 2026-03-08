@@ -149,6 +149,64 @@ async function syncSource(source: SourceRow, globalLimit?: number) {
   console.log(`\n✅ Sync complete: ${articlesImported} imported, ${errors.length} errors`);
 }
 
+async function syncBriefings() {
+  console.log(`\n═══════════════════════════════════════`);
+  console.log(`📋 Syncing briefings`);
+  console.log(`═══════════════════════════════════════`);
+
+  // For now, only The Economist's World in Brief
+  const briefingUrls = [
+    { source: 'The Economist', url: 'https://www.economist.com/the-world-in-brief' },
+  ];
+
+  const allItems: { theme: string; items: BriefingSection['items'] }[] = [];
+
+  for (const { source, url } of briefingUrls) {
+    const items = await scrapeBriefing(url);
+    if (items.length === 0) continue;
+
+    // Try to match items to existing clusters
+    const clusters = await fetchRecentClusters();
+
+    for (const item of items) {
+      // Simple keyword matching to link to clusters
+      let matchedClusterId: string | undefined;
+      const itemLower = item.summary.toLowerCase();
+      for (const cluster of clusters) {
+        const keywords = cluster.top_keywords || [];
+        const titleWords = (cluster.short_title || cluster.title).toLowerCase().split(/\s+/);
+        const allKeywords = [...keywords, ...titleWords];
+        const matchCount = allKeywords.filter(kw => itemLower.includes(kw.toLowerCase())).length;
+        if (matchCount >= 2) {
+          matchedClusterId = cluster.id;
+          break;
+        }
+      }
+
+      // Group by theme
+      let themeGroup = allItems.find(g => g.theme === item.theme);
+      if (!themeGroup) {
+        themeGroup = { theme: item.theme, items: [] };
+        allItems.push(themeGroup);
+      }
+      themeGroup.items.push({
+        title: item.title,
+        summary: item.summary,
+        why_it_matters: '', // Could be AI-generated later
+        sources: item.sources,
+        cluster_id: matchedClusterId,
+      });
+    }
+  }
+
+  if (allItems.length > 0) {
+    await upsertDailyBriefing(allItems);
+    console.log(`\n✅ Briefing sync complete: ${allItems.reduce((s, g) => s + g.items.length, 0)} items across ${allItems.length} themes`);
+  } else {
+    console.log(`\n⚠ No briefing items scraped`);
+  }
+}
+
 async function runOnce(globalLimit?: number) {
   validateConfig();
   console.log('🚀 News Intelligence Hub — Local Agent');
@@ -159,15 +217,17 @@ async function runOnce(globalLimit?: number) {
 
     if (sources.length === 0) {
       console.log('No sources with auto-sync enabled. Add and enable sources in the app.');
-      return;
+    } else {
+      console.log(`Found ${sources.length} source(s) to sync:`);
+      sources.forEach(s => console.log(`  • ${s.source_name} (${s.source_type})`));
+
+      for (const source of sources) {
+        await syncSource(source, globalLimit);
+      }
     }
 
-    console.log(`Found ${sources.length} source(s) to sync:`);
-    sources.forEach(s => console.log(`  • ${s.source_name} (${s.source_type})`));
-
-    for (const source of sources) {
-      await syncSource(source, globalLimit);
-    }
+    // Always sync briefings alongside articles
+    await syncBriefings();
   } finally {
     await closeBrowser();
   }
