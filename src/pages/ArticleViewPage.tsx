@@ -132,7 +132,7 @@ export default function ArticleViewPage() {
   if (!article) {
     return (
       <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+        <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <p className="text-muted-foreground">Article not found.</p>
