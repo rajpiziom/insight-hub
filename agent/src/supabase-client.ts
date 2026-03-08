@@ -268,3 +268,67 @@ export async function updateSourceSyncStatus(sourceId: string, status: string) {
     })
     .eq('id', sourceId);
 }
+
+// ===== DAILY BRIEFINGS =====
+
+export interface BriefingSection {
+  theme: string;
+  items: {
+    title: string;
+    summary: string;
+    why_it_matters: string;
+    sources: string[];
+    cluster_id?: string;
+  }[];
+}
+
+export async function upsertDailyBriefing(sections: BriefingSection[]) {
+  const { supabase, userId } = await getSupabase();
+  const today = new Date().toISOString().split('T')[0];
+
+  const content = { sections };
+
+  // Upsert by date — if a briefing already exists for today, update it
+  const { data: existing } = await supabase
+    .from('daily_briefings')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('date', today)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('daily_briefings')
+      .update({
+        content,
+        generated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id);
+    if (error) console.error(`  ✗ Briefing update failed: ${error.message}`);
+    else console.log(`  ✓ Updated today's briefing`);
+  } else {
+    const { error } = await supabase
+      .from('daily_briefings')
+      .insert({
+        user_id: userId,
+        date: today,
+        content,
+        generated_at: new Date().toISOString(),
+      });
+    if (error) console.error(`  ✗ Briefing insert failed: ${error.message}`);
+    else console.log(`  ✓ Created today's briefing`);
+  }
+}
+
+export async function fetchRecentClusters() {
+  const { supabase, userId } = await getSupabase();
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('event_clusters')
+    .select('id, title, short_title, top_keywords')
+    .eq('user_id', userId)
+    .gte('last_updated_at', oneDayAgo)
+    .eq('status', 'active');
+  if (error) return [];
+  return data || [];
+}
