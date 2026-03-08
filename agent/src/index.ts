@@ -91,7 +91,7 @@ async function syncSource(source: SourceRow) {
         try {
           const article = await extractArticle(link.url);
           if (article) {
-            const result = await insertArticle(source.id, article);
+            const result = await upsertArticle(source.id, article);
             if (!result.deduplicated && result.articleId) {
               articlesImported++;
               console.log(`    ✓ Imported: ${article.title}`);
