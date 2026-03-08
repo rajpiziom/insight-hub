@@ -18,7 +18,7 @@ import { discoverArticleUrls } from './discover.js';
 import { extractArticle } from './extract.js';
 import { closeBrowser } from './browser.js';
 
-async function syncSource(source: SourceRow) {
+async function syncSource(source: SourceRow, globalLimit?: number) {
   console.log(`\n═══════════════════════════════════════`);
   console.log(`📰 Syncing: ${source.source_name} (${source.source_domain})`);
   console.log(`═══════════════════════════════════════`);
@@ -72,12 +72,12 @@ async function syncSource(source: SourceRow) {
     console.log(`\n📊 Discovery complete: ${urlsDiscovered} found, ${urlsNew} new`);
 
     // Step 3: Gather URLs to extract (new + previously failed)
-    const MAX_PER_SECTION = 2;
-    let toExtract = allDiscovered.slice(0, allEndpoints.length * MAX_PER_SECTION);
+    const maxTotal = globalLimit ?? allEndpoints.length * 2;
+    let toExtract = allDiscovered.slice(0, maxTotal);
 
     // Also pick up previously discovered but un-ingested URLs
     if (toExtract.length === 0) {
-      const uningested = await fetchUningestedUrls(source.id, allEndpoints.length * MAX_PER_SECTION);
+      const uningested = await fetchUningestedUrls(source.id, maxTotal);
       if (uningested.length > 0) {
         console.log(`\n🔄 Retrying ${uningested.length} previously discovered but un-ingested URLs...`);
         toExtract = uningested.map(u => ({ url: u.url, title: u.title }));
@@ -134,7 +134,7 @@ async function syncSource(source: SourceRow) {
   console.log(`\n✅ Sync complete: ${articlesImported} imported, ${errors.length} errors`);
 }
 
-async function runOnce() {
+async function runOnce(globalLimit?: number) {
   validateConfig();
   console.log('🚀 News Intelligence Hub — Local Agent');
   console.log(`   Time: ${new Date().toLocaleString()}\n`);
@@ -151,7 +151,7 @@ async function runOnce() {
     sources.forEach(s => console.log(`  • ${s.source_name} (${s.source_type})`));
 
     for (const source of sources) {
-      await syncSource(source);
+      await syncSource(source, globalLimit);
     }
   } finally {
     await closeBrowser();
@@ -167,8 +167,10 @@ program
 program
   .command('sync')
   .description('Run one sync cycle for all enabled sources')
-  .action(async () => {
-    await runOnce();
+  .option('-l, --limit <n>', 'Max total articles to extract per source')
+  .action(async (opts) => {
+    const limit = opts.limit ? parseInt(opts.limit) : undefined;
+    await runOnce(limit);
   });
 
 program
