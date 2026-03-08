@@ -72,8 +72,8 @@ async function syncSource(source: SourceRow, globalLimit?: number) {
     console.log(`\n📊 Discovery complete: ${urlsDiscovered} found, ${urlsNew} new`);
 
     // Step 3: Gather URLs to extract (new + previously failed)
-    const MAX_PER_SECTION = 2;
-    let toExtract = allDiscovered.slice(0, allEndpoints.length * MAX_PER_SECTION);
+    const maxTotal = globalLimit ?? allEndpoints.length * 2;
+    let toExtract = allDiscovered.slice(0, maxTotal);
 
     // Also pick up previously discovered but un-ingested URLs
     if (toExtract.length === 0) {
