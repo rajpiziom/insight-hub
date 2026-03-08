@@ -15,8 +15,15 @@ function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<number, { id: string; title: string; quote?: string }> }) {
+// CitedText renders inline citation markers as links to the specific passage in the article
+function CitedText({ text, articleIndex, citationQuotes, citationOffset }: { 
+  text: string; 
+  articleIndex: Record<number, { id: string; title: string }>; 
+  citationQuotes: { num: number; quote: string }[];
+  citationOffset: number;
+}) {
   const parts = text.split(/(\[\d+\])/g);
+  let localIdx = 0;
   return (
     <>
       {parts.map((part, i) => {
@@ -24,10 +31,12 @@ function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<
         if (match) {
           const num = parseInt(match[1]);
           const article = articleIndex[num];
+          const quoteEntry = citationQuotes[citationOffset + localIdx];
+          localIdx++;
           if (article) {
-            const highlightParam = article.quote ? `?highlight=${encodeURIComponent(article.quote)}` : '';
+            const highlightParam = quoteEntry?.quote ? `?highlight=${encodeURIComponent(quoteEntry.quote)}` : '';
             return (
-              <Link key={i} to={`/articles/${article.id}${highlightParam}`} className="inline-flex items-center no-underline" title={article.title}>
+              <Link key={i} to={`/articles/${article.id}${highlightParam}`} className="inline-flex items-center no-underline" title={quoteEntry?.quote || article.title}>
                 <span className="text-[10px] font-medium text-primary bg-primary/10 rounded px-1 py-0.5 hover:bg-primary/20 transition-colors cursor-pointer">{num}</span>
               </Link>
             );
@@ -37,6 +46,11 @@ function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<
       })}
     </>
   );
+}
+
+// Count citation markers in a string
+function countCitations(text: string): number {
+  return (text.match(/\[\d+\]/g) || []).length;
 }
 
 export default function TopicDetailPage() {
