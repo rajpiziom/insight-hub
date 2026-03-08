@@ -38,19 +38,29 @@ export const extractScript = `(() => {
     getAttr('meta[property="og:image"]', 'content') ||
     (document.querySelector('article figure img') ? document.querySelector('article figure img').src : '') || '';
 
+  // Aggressively remove all non-body elements from article before extraction
   const article = document.querySelector('article');
   if (article) {
+    // Remove known noise elements
     article.querySelectorAll(
-      'nav, footer, header, script, style, ' +
-      '.advert, .newsletter-signup, .newsletter-promo, ' +
+      'nav, footer, header, script, style, noscript, iframe, svg, ' +
+      'h1, figcaption, figure, ' +
+      '.advert, .newsletter-signup, .newsletter-promo, .newsletter, ' +
       '.related-articles, .article__aside, .aside, ' +
       '.recommended, .teaser, [role="complementary"], ' +
       '[role="navigation"], .sticky-nav, .article-links, ' +
-      '[data-test-id="related-content"], [data-test-id="newsletter-signup"]'
+      '[data-test-id="related-content"], [data-test-id="newsletter-signup"], ' +
+      '[data-component="share"], [data-component="newsletter"], ' +
+      '[data-component="recommended"], [data-component="article-links"], ' +
+      'form, button, [class*="paywall"], [class*="gate"], ' +
+      '[class*="regwall"], [class*="subscribe"], [class*="promo"], ' +
+      '[class*="newsletter"], [class*="signup"], [class*="sign-up"], ' +
+      '[class*="related"], [class*="more-from"], [class*="sidebar"], ' +
+      '[id*="paywall"], [id*="gate"], [id*="newsletter"]'
     ).forEach(el => el.remove());
   }
 
-  // Try paragraph-based selectors first
+  // Try paragraph-based selectors
   const bodySelectors = [
     'article [data-component="body"] p',
     'article .article__body p',
@@ -69,7 +79,7 @@ export const extractScript = `(() => {
     if (ps.length >= 2) {
       const text = Array.from(ps)
         .map(p => (p.textContent || '').trim())
-        .filter(t => t.length > 30)
+        .filter(t => t.length > 20)
         .join('\\n\\n');
       if (text.length > bodyText.length) {
         bodyText = text;
@@ -77,7 +87,7 @@ export const extractScript = `(() => {
     }
   }
 
-  // Fallback: get innerText from the article body container directly
+  // Fallback: get innerText from body container
   if (bodyText.length < 1500) {
     const containerSelectors = [
       '[data-component="body"]',
@@ -90,6 +100,12 @@ export const extractScript = `(() => {
     for (const sel of containerSelectors) {
       const container = document.querySelector(sel);
       if (container) {
+        // Remove noise from container too
+        container.querySelectorAll(
+          'form, button, [class*="paywall"], [class*="gate"], ' +
+          '[class*="newsletter"], [class*="subscribe"], [class*="promo"], ' +
+          '[class*="related"], [class*="signup"], nav, footer, aside'
+        ).forEach(el => el.remove());
         const text = container.innerText.trim();
         debug['fallback_' + sel] = text.length;
         if (text.length > bodyText.length) {
@@ -99,12 +115,18 @@ export const extractScript = `(() => {
     }
   }
 
-  // Last resort: entire article innerText minus title area
+  // Last resort: entire article innerText (already cleaned above)
   if (bodyText.length < 1500 && article) {
     const fullText = article.innerText.trim();
     debug['fallback_article_innerText'] = fullText.length;
-    if (fullText.length > bodyText.length) {
-      bodyText = fullText;
+    // Clean: remove lines that look like navigation/promo (very short lines in bulk)
+    const lines = fullText.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
+    // Find the actual article content: paragraphs > 80 chars
+    const contentLines = lines.filter(l => l.length > 80);
+    const cleaned = contentLines.join('\\n\\n');
+    debug['fallback_cleaned'] = cleaned.length;
+    if (cleaned.length > bodyText.length) {
+      bodyText = cleaned;
     }
   }
 
