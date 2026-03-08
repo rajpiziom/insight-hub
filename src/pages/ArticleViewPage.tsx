@@ -18,6 +18,8 @@ export default function ArticleViewPage() {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; key_takeaways?: string[]; why_it_matters?: string; implications?: string } | null>(null);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
 
   const { data: article, isLoading } = useQuery({
     queryKey: ['article', id],
