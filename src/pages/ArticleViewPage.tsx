@@ -75,6 +75,31 @@ export default function ArticleViewPage() {
       navigate('/articles');
     }
   };
+
+  // Show floating back bar when scrolling up
+  const [showBackBar, setShowBackBar] = useState(false);
+  const lastScrollY = useRef(0);
+  const scrolledDown = useRef(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      if (currentY > 200) scrolledDown.current = true;
+      if (scrolledDown.current && currentY < lastScrollY.current - 10) {
+        setShowBackBar(true);
+      }
+      if (currentY > lastScrollY.current + 10) {
+        setShowBackBar(false);
+      }
+      if (currentY < 50) {
+        setShowBackBar(false);
+        scrolledDown.current = false;
+      }
+      lastScrollY.current = currentY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   const [showSummary, setShowSummary] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; key_takeaways?: string[]; why_it_matters?: string; implications?: string } | null>(null);
@@ -150,15 +175,29 @@ export default function ArticleViewPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-      <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="w-4 h-4" /> Back
-      </button>
+    <>
+      {/* Floating back bar — appears when scrolling up */}
+      <motion.div
+        initial={{ y: -60 }}
+        animate={{ y: showBackBar ? 0 : -60 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-b border-border shadow-sm px-4 py-2.5 flex items-center gap-3"
+      >
+        <button onClick={goBack} className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+        <span className="text-xs text-muted-foreground truncate">{article.title}</span>
+      </motion.div>
 
-      <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl overflow-hidden">
-        <div className="p-6 lg:p-8">
-          <div className="flex items-center gap-3 mb-4">
-            <SourceBadge name={article.source_name} />
+      <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+        <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
+
+        <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="p-6 lg:p-8">
+            <div className="flex items-center gap-3 mb-4">
+              <SourceBadge name={article.source_name} />
             <SentimentIndicator sentiment={article.sentiment} />
           </div>
 
@@ -254,5 +293,6 @@ export default function ArticleViewPage() {
         </div>
       </motion.article>
     </div>
+    </>
   );
 }
