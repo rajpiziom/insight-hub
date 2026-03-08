@@ -142,9 +142,9 @@ export default function ArticleViewPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-      <Link to="/articles" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="w-4 h-4" /> Back to Articles
-      </Link>
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+        <ArrowLeft className="w-4 h-4" /> Back
+      </button>
 
       <motion.article initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border rounded-2xl overflow-hidden">
         <div className="p-6 lg:p-8">
