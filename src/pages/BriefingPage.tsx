@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Zap, Calendar, RefreshCw, Inbox, ChevronDown, ChevronUp } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
@@ -8,6 +8,7 @@ import { categoryColors } from '@/data/mockData';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { fetchBriefing, generateBriefing } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { DailyBriefing, BriefingContent } from '@/types';
 
