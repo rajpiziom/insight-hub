@@ -417,7 +417,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, summary: cleanSummary, articleIndex, citationQuotes }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
 
     } else if (action === "classify") {
       // AI-based classification: assigns theme + matches to event clusters
