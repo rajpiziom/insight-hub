@@ -1,13 +1,27 @@
+// === Source Types ===
+export type SourceType = 'rss_connector' | 'api_connector' | 'manual_url_import' | 'browser_session_connector' | 'local_desktop_agent' | 'web_extension_connector';
+export type SourceStatus = 'connected' | 'needs_attention' | 'syncing' | 'error' | 'inactive';
+export type SourceAuthMethod = 'none' | 'rss' | 'api_key' | 'oauth' | 'browser_session' | 'local_agent' | 'extension' | 'manual';
+export type ArticleStatus = 'imported' | 'processed' | 'enriched' | 'error';
+export type ArticleSentiment = 'positive' | 'negative' | 'neutral' | 'mixed';
+export type ClusterStatus = 'active' | 'developing' | 'stale' | 'archived';
+export type IngestionJobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+
 export interface Source {
   id: string;
   user_id: string;
-  name: string;
-  type: 'rss' | 'api' | 'manual' | 'browser' | 'file';
-  base_url: string;
-  topic_tags: string[];
+  source_name: string;
+  source_domain: string | null;
+  source_type: SourceType;
   is_active: boolean;
-  priority: number;
+  sync_frequency: string;
   last_sync_at: string | null;
+  last_successful_sync_at: string | null;
+  status: SourceStatus;
+  notes: string | null;
+  auth_method: SourceAuthMethod;
+  connector_settings: Record<string, any>;
+  article_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -15,32 +29,87 @@ export interface Source {
 export interface Article {
   id: string;
   user_id: string;
-  source_id: string;
+  source_id: string | null;
   source_name: string;
+  canonical_url: string;
   title: string;
+  subtitle: string | null;
   author: string | null;
-  published_at: string;
-  url: string;
-  full_text: string;
-  image_url: string | null;
+  published_at: string | null;
+  body_text: string | null;
+  section: string | null;
   topic_tags: string[];
-  cluster_id: string | null;
-  sentiment: 'positive' | 'negative' | 'neutral' | 'mixed';
+  hero_image_url: string | null;
+  content_hash: string | null;
+  language: string;
+  status: ArticleStatus;
+  confidence_score: number;
+  sentiment: ArticleSentiment;
   is_read: boolean;
   is_bookmarked: boolean;
+  imported_at: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface TopicCluster {
+export interface IngestionJob {
+  id: string;
+  user_id: string;
+  source_id: string | null;
+  status: IngestionJobStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  articles_found: number;
+  articles_imported: number;
+  articles_deduplicated: number;
+  errors_count: number;
+  warnings: string[];
+  created_at: string;
+  // joined
+  source?: Source;
+}
+
+export interface EventCluster {
   id: string;
   user_id: string;
   title: string;
-  overview: string;
+  short_title: string | null;
+  overview: string | null;
+  why_it_matters: string | null;
+  first_seen_at: string;
+  last_updated_at: string;
+  status: ClusterStatus;
+  top_entities: string[];
+  top_keywords: string[];
+  source_count: number;
   article_count: number;
-  sources: string[];
-  top_tags: string[];
-  latest_update: string;
+  relevance_score: number;
+  recency_score: number;
+  created_at: string;
+  // joined
+  articles?: Article[];
+  themes?: MacroTheme[];
+}
+
+export interface MacroTheme {
+  id: string;
+  name: string;
+  display_name: string;
+  color: string | null;
+  icon: string | null;
+  sort_order: number;
+  created_at: string;
+  // joined
+  clusters?: EventCluster[];
+}
+
+export interface NamedEntity {
+  id: string;
+  user_id: string;
+  name: string;
+  entity_type: string;
+  mention_count: number;
+  last_seen_at: string;
   created_at: string;
 }
 
@@ -49,18 +118,20 @@ export interface ArticleSummary {
   article_id: string;
   summary: string;
   key_takeaways: string[];
-  why_it_matters: string;
+  why_it_matters: string | null;
   implications: string | null;
   created_at: string;
 }
 
-export interface TopicComparison {
+export interface ClusterComparison {
   id: string;
   cluster_id: string;
   agreements: string[];
   differences: string[];
-  tone_analysis: string;
+  tone_analysis: string | null;
   missing_angles: string[];
+  timeline_differences: string | null;
+  emphasis_analysis: Record<string, any>;
   created_at: string;
 }
 
@@ -68,27 +139,33 @@ export interface DailyBriefing {
   id: string;
   user_id: string;
   date: string;
-  sections: BriefingSection[];
+  content: BriefingContent;
+  generated_at: string;
   created_at: string;
 }
 
+export interface BriefingContent {
+  sections: BriefingSection[];
+}
+
 export interface BriefingSection {
-  category: string;
+  theme: string;
   items: BriefingItem[];
 }
 
 export interface BriefingItem {
   title: string;
   summary: string;
-  cluster_id?: string;
+  why_it_matters: string;
   sources: string[];
+  cluster_id?: string;
 }
 
 export interface ChatSession {
   id: string;
   user_id: string;
   title: string;
-  context_type: 'general' | 'topic' | 'article';
+  context_type: string;
   context_id: string | null;
   created_at: string;
   updated_at: string;
@@ -110,9 +187,9 @@ export interface UserPreferences {
   muted_topics: string[];
   preferred_sources: string[];
   briefing_categories: string[];
-  view_density: 'compact' | 'detailed';
-  default_sort: 'date' | 'relevance' | 'source';
-  summary_length: 'short' | 'medium' | 'long';
+  view_density: string;
+  default_sort: string;
+  summary_length: string;
 }
 
 export interface Bookmark {
@@ -121,3 +198,32 @@ export interface Bookmark {
   article_id: string;
   created_at: string;
 }
+
+// Source type display labels
+export const sourceTypeLabels: Record<SourceType, string> = {
+  rss_connector: 'RSS Feed',
+  api_connector: 'API Connector',
+  manual_url_import: 'Manual Import',
+  browser_session_connector: 'Browser Session',
+  local_desktop_agent: 'Desktop Agent',
+  web_extension_connector: 'Browser Extension',
+};
+
+export const sourceStatusLabels: Record<SourceStatus, string> = {
+  connected: 'Connected',
+  needs_attention: 'Needs Attention',
+  syncing: 'Syncing',
+  error: 'Error',
+  inactive: 'Inactive',
+};
+
+export const sourceAuthLabels: Record<SourceAuthMethod, string> = {
+  none: 'None',
+  rss: 'RSS Feed',
+  api_key: 'API Key',
+  oauth: 'OAuth',
+  browser_session: 'Browser Session',
+  local_agent: 'Local Agent',
+  extension: 'Extension',
+  manual: 'Manual',
+};
