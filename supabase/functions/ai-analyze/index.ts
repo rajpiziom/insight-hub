@@ -336,7 +336,7 @@ serve(async (req) => {
       const articleIds = clusterArticles.map(ca => ca.article_id);
       const { data: articles } = await supabase
         .from("articles")
-        .select("title, source_name, author, published_at, body_text, topic_tags")
+        .select("id, title, source_name, author, published_at, body_text, topic_tags")
         .in("id", articleIds)
         .order("published_at", { ascending: true });
 
