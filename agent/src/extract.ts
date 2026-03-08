@@ -34,8 +34,14 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
     // Extract directly from the live rendered DOM via Playwright
     const extracted = await page.evaluate(extractScript) as {
       title: string; subtitle: string; author: string;
+      title: string; subtitle: string; author: string;
       publishedAt: string; heroImage: string; bodyText: string;
+      debug?: Record<string, number>;
     };
+
+    if (extracted.debug) {
+      console.log(`    🔍 Selector debug:`, JSON.stringify(extracted.debug));
+    }
 
     if (!extracted.title) {
       console.warn('    ⚠ Could not extract title');
