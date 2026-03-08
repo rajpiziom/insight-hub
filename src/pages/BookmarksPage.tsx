@@ -4,6 +4,7 @@ import { Bookmark as BookmarkIcon, ArrowRight, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import economistLogo from '@/assets/economist-logo.png';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
