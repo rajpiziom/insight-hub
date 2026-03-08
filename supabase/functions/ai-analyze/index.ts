@@ -385,13 +385,29 @@ serve(async (req) => {
       const data = await response.json();
       const summary = data.choices?.[0]?.message?.content || "";
 
-      // Build article index mapping: number -> { id, title }
-      const articleIndex: Record<number, { id: string; title: string }> = {};
+      // Build article index mapping: number -> { id, title, quote }
+      const articleIndex: Record<number, { id: string; title: string; quote?: string }> = {};
       (articles || []).forEach((a, i) => {
         articleIndex[i + 1] = { id: a.id, title: a.title };
       });
 
-      return new Response(JSON.stringify({ success: true, summary, articleIndex }), {
+      // Parse quotes from the response
+      let cleanSummary = summary;
+      const quotesSplit = summary.split("---QUOTES---");
+      if (quotesSplit.length > 1) {
+        cleanSummary = quotesSplit[0].trim();
+        try {
+          const quotes = JSON.parse(quotesSplit[1].trim());
+          for (const [num, quote] of Object.entries(quotes)) {
+            const idx = parseInt(num);
+            if (articleIndex[idx]) {
+              articleIndex[idx].quote = quote as string;
+            }
+          }
+        } catch {}
+      }
+
+      return new Response(JSON.stringify({ success: true, summary: cleanSummary, articleIndex }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

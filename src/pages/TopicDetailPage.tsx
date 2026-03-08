@@ -15,8 +15,7 @@ function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<number, { id: string; title: string }> }) {
-  // Split text by citation markers like [1], [2][3], etc.
+function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<number, { id: string; title: string; quote?: string }> }) {
   const parts = text.split(/(\[\d+\])/g);
   return (
     <>
@@ -26,8 +25,9 @@ function CitedText({ text, articleIndex }: { text: string; articleIndex: Record<
           const num = parseInt(match[1]);
           const article = articleIndex[num];
           if (article) {
+            const highlightParam = article.quote ? `?highlight=${encodeURIComponent(article.quote)}` : '';
             return (
-              <Link key={i} to={`/articles/${article.id}`} className="inline-flex items-center no-underline" title={article.title}>
+              <Link key={i} to={`/articles/${article.id}${highlightParam}`} className="inline-flex items-center no-underline" title={article.title}>
                 <span className="text-[10px] font-medium text-primary bg-primary/10 rounded px-1 py-0.5 hover:bg-primary/20 transition-colors cursor-pointer">{num}</span>
               </Link>
             );
