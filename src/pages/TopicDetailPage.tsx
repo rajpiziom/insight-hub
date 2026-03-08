@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, BookOpen, LayoutList, Columns, Clock, Loader2, Sparkles } from 'lucide-react';
@@ -55,6 +55,7 @@ function countCitations(text: string): number {
 
 export default function TopicDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
   const [activeMode, setActiveMode] = useState<'explain' | 'updates' | null>(null);
   const [loading, setLoading] = useState(false);
@@ -103,9 +104,9 @@ export default function TopicDetailPage() {
   if (!cluster) {
     return (
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <Link to="/topics" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="w-4 h-4" /> Back to Topics
-        </Link>
+        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+          <ArrowLeft className="w-4 h-4" /> Back
+        </button>
         <p className="text-muted-foreground">Topic not found.</p>
       </div>
     );
@@ -113,9 +114,9 @@ export default function TopicDetailPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-      <Link to="/topics" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="w-4 h-4" /> Back to Topics
-      </Link>
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+        <ArrowLeft className="w-4 h-4" /> Back
+      </button>
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <div className="bg-card border border-border rounded-2xl p-6 lg:p-8 mb-6">
