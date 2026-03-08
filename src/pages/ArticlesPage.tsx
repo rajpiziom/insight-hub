@@ -95,6 +95,10 @@ export default function ArticlesPage() {
           <option value="all">All Topics</option>
           {allTopics.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleTagAll} disabled={tagging}>
+          {tagging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tags className="w-3.5 h-3.5" />}
+          {tagging ? 'Tagging...' : 'Auto-Tag All'}
+        </Button>
       </div>
 
       {isLoading ? (
