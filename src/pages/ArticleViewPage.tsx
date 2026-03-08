@@ -1,13 +1,12 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ExternalLink, Bookmark, CheckCircle, Sparkles, GitCompare, MessageSquare, Clock, User } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Bookmark, CheckCircle, Sparkles, GitCompare, MessageSquare, Clock, User, Loader2 } from 'lucide-react';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { SentimentIndicator } from '@/components/ui/sentiment-indicator';
 import { Button } from '@/components/ui/button';
-import { mockArticles, mockSummary, mockClusterArticleMap } from '@/data/mockData';
-import { summarizeArticle } from '@/lib/api';
-import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -15,21 +14,29 @@ function formatDate(dateStr: string) {
 
 export default function ArticleViewPage() {
   const { id } = useParams();
-  const article = mockArticles.find(a => a.id === id);
   const [showSummary, setShowSummary] = useState(false);
-  const [summarizing, setSummarizing] = useState(false);
 
-  // Find cluster for this article
-  const clusterId = Object.entries(mockClusterArticleMap).find(([, articles]) => articles.includes(id || ''))?.[0];
+  const { data: article, isLoading } = useQuery({
+    queryKey: ['article', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('articles')
+        .select('*')
+        .eq('id', id!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
 
-  const handleSummarize = async () => {
-    if (showSummary) { setShowSummary(false); return; }
-    setShowSummary(true);
-    // For demo, show mock summary. In production, call AI:
-    // setSummarizing(true);
-    // try { await summarizeArticle(article.id); } catch { toast.error('Failed to summarize'); }
-    // setSummarizing(false);
-  };
+  if (isLoading) {
+    return (
+      <div className="p-6 lg:p-8 max-w-4xl mx-auto flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (!article) {
     return (
@@ -53,27 +60,23 @@ export default function ArticleViewPage() {
           <div className="flex items-center gap-3 mb-4">
             <SourceBadge name={article.source_name} />
             <SentimentIndicator sentiment={article.sentiment} />
-            {clusterId && (
-              <Link to={`/topics/${clusterId}`} className="text-xs text-primary hover:underline">View Topic Cluster</Link>
-            )}
           </div>
 
           <h1 className="font-display text-2xl lg:text-3xl font-bold mb-4 leading-tight">{article.title}</h1>
+          {article.subtitle && <p className="text-muted-foreground mb-4">{article.subtitle}</p>}
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6 pb-6 border-b border-border">
             {article.author && (
               <span className="flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> {article.author}</span>
             )}
-            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {formatDate(article.published_at || '')}</span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-muted">Quality: {Math.round(article.confidence_score * 100)}%</span>
+            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {formatDate(article.published_at || article.imported_at)}</span>
+            {article.section && <span className="text-[10px] px-2 py-0.5 rounded bg-muted">{article.section}</span>}
           </div>
 
           <div className="flex flex-wrap gap-2 mb-8">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSummarize}>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowSummary(!showSummary)}>
               <Sparkles className="w-3.5 h-3.5" /> {showSummary ? 'Hide Summary' : 'Summarise'}
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5"><GitCompare className="w-3.5 h-3.5" /> Compare</Button>
-            <Button variant="outline" size="sm" className="gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Ask AI</Button>
             <Button variant="outline" size="sm" className="gap-1.5"><Bookmark className="w-3.5 h-3.5" /> Save</Button>
             <Button variant="outline" size="sm" className="gap-1.5"><CheckCircle className="w-3.5 h-3.5" /> Mark Read</Button>
             <a href={article.canonical_url} target="_blank" rel="noopener noreferrer">
@@ -81,34 +84,8 @@ export default function ArticleViewPage() {
             </a>
           </div>
 
-          {showSummary && article.id === 'a1' && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-muted rounded-xl p-5 mb-8">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <h3 className="font-display font-semibold text-sm">AI Summary</h3>
-              </div>
-              <p className="text-sm leading-relaxed mb-4">{mockSummary.summary}</p>
-              <div className="mb-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Key Takeaways</h4>
-                <ul className="space-y-1">
-                  {mockSummary.key_takeaways.map((t, i) => (
-                    <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                      <span className="text-primary mt-1">•</span> {t}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="mb-4">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Why It Matters</h4>
-                <p className="text-sm text-muted-foreground">{mockSummary.why_it_matters}</p>
-              </div>
-              {mockSummary.implications && (
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Bull / Bear</h4>
-                  <p className="text-sm text-muted-foreground">{mockSummary.implications}</p>
-                </div>
-              )}
-            </motion.div>
+          {article.hero_image_url && (
+            <img src={article.hero_image_url} alt={article.title} className="w-full rounded-xl mb-8 object-cover max-h-96" />
           )}
 
           <div className="prose prose-sm max-w-none">
@@ -118,7 +95,7 @@ export default function ArticleViewPage() {
           </div>
 
           <div className="flex items-center gap-1.5 mt-8 pt-6 border-t border-border">
-            {article.topic_tags.map(tag => (
+            {(article.topic_tags || []).map(tag => (
               <span key={tag} className="text-xs px-2 py-1 rounded-md bg-muted text-muted-foreground">{tag}</span>
             ))}
           </div>
