@@ -206,7 +206,7 @@ export default function TopicDetailPage() {
                     return paragraphs.map((p, i) => {
                       const el = (
                         <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">
-                          <CitedText text={p} articleIndex={articleIndex} citationQuotes={explainQuotes} citationOffset={offset} />
+                          <CitedText text={p} articleIndex={articleIndex} citationQuotes={explainQuotes} citationOffset={offset} fromPath={currentPath} />
                         </p>
                       );
                       offset += countCitations(p);
