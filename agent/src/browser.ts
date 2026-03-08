@@ -104,8 +104,8 @@ export async function newPage(): Promise<Page> {
 
 export async function closeBrowser() {
   if (browser) {
-    // Disconnect but don't close the user's browser!
-    await browser.close();
+    // Disconnect from the browser WITHOUT closing it
+    browser.disconnect();
     browser = null;
     context = null;
   }
