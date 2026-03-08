@@ -132,7 +132,7 @@ export async function updateArticleBody(articleId: string, extracted: {
   if (error) console.error(`  ✗ Update failed: ${error.message}`);
 }
 
-export async function upsertArticle(article: {
+export async function upsertArticle(sourceId: string, article: {
   canonical_url: string;
   title: string;
   subtitle?: string;
