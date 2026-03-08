@@ -60,7 +60,9 @@ export default function TopicDetailPage() {
   const [loading, setLoading] = useState(false);
   const [explainText, setExplainText] = useState<string | null>(null);
   const [updatesText, setUpdatesText] = useState<string | null>(null);
-  const [articleIndex, setArticleIndex] = useState<Record<number, { id: string; title: string; quote?: string }>>({});
+  const [articleIndex, setArticleIndex] = useState<Record<number, { id: string; title: string }>>({});
+  const [explainQuotes, setExplainQuotes] = useState<{ num: number; quote: string }[]>([]);
+  const [updatesQuotes, setUpdatesQuotes] = useState<{ num: number; quote: string }[]>([]);
 
   const { data: cluster, isLoading: clusterLoading } = useQuery({
     queryKey: ['cluster', id],
