@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, ArrowRight, Bookmark, Loader2 } from 'lucide-react';
+import economistLogo from '@/assets/economist-logo.png';
 import { PageHeader } from '@/components/ui/page-header';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { SentimentIndicator } from '@/components/ui/sentiment-indicator';
