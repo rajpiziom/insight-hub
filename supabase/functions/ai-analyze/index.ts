@@ -325,6 +325,62 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, clusters_created: created }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    } else if (action === "summarize-cluster" && clusterId) {
+      const { data: clusterArticles } = await supabase
+        .from("event_cluster_articles")
+        .select("article_id")
+        .eq("cluster_id", clusterId);
+
+      if (!clusterArticles || clusterArticles.length === 0) throw new Error("No articles in cluster");
+
+      const articleIds = clusterArticles.map(ca => ca.article_id);
+      const { data: articles } = await supabase
+        .from("articles")
+        .select("title, source_name, author, published_at, body_text, topic_tags")
+        .in("id", articleIds)
+        .order("published_at", { ascending: true });
+
+      if (!articles || articles.length === 0) throw new Error("No articles found");
+
+      // Get the cluster info for context
+      const { data: cluster } = await supabase
+        .from("event_clusters")
+        .select("title, overview")
+        .eq("id", clusterId)
+        .single();
+
+      systemPrompt = `You are a senior intelligence briefing analyst. Synthesize all the articles below into a comprehensive event summary. Structure it as a briefing that combines all perspectives, highlights the latest developments, identifies key players, and explains the implications. Write in clear, authoritative prose — not bullet points. Include a timeline of how the story evolved based on publication dates. The summary should be 3-5 paragraphs.`;
+
+      prompt = `Event: ${cluster?.title || "Unknown"}\n\nArticles (${articles.length} total, ordered chronologically):\n\n${articles.map((a, i) =>
+        `--- [${i + 1}] ${a.source_name} | ${a.author || "Unknown"} | ${a.published_at || "undated"} ---\n"${a.title}"\nTags: ${(a.topic_tags || []).join(", ")}\n${(a.body_text || "").substring(0, 3000)}\n`
+      ).join("\n")}`;
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: prompt },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`AI gateway error [${response.status}]: ${text}`);
+      }
+
+      const data = await response.json();
+      const summary = data.choices?.[0]?.message?.content || "";
+
+      return new Response(JSON.stringify({ success: true, summary }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), {
