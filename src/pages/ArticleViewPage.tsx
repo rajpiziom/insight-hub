@@ -30,6 +30,9 @@ export default function ArticleViewPage() {
         .eq('id', id!)
         .single();
       if (error) throw error;
+      // Check bookmark status
+      const { data: bm } = await supabase.from('bookmarks').select('id').eq('article_id', id!).maybeSingle();
+      setIsBookmarked(!!bm);
       return data;
     },
     enabled: !!id,
