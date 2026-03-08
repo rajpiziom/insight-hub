@@ -50,12 +50,23 @@ async function syncSource(source: SourceRow, globalLimit?: number) {
       errors.push('No discovery endpoints configured');
     }
 
-    // Step 2: Discover article URLs from each section
+    // Step 2: Discover article URLs from all sections in parallel
     const allDiscovered: { url: string; title: string | null }[] = [];
 
-    for (const endpoint of allEndpoints) {
-      console.log(`\n📂 Section: ${endpoint.label}`);
-      const links = await discoverArticleUrls(endpoint.url);
+    const discoveryResults = await Promise.allSettled(
+      allEndpoints.map(async (endpoint) => {
+        console.log(`\n📂 Section: ${endpoint.label}`);
+        const links = await discoverArticleUrls(endpoint.url);
+        return { endpoint, links };
+      })
+    );
+
+    for (const result of discoveryResults) {
+      if (result.status === 'rejected') {
+        errors.push(`Discovery failed: ${result.reason}`);
+        continue;
+      }
+      const { links } = result.value;
       urlsDiscovered += links.length;
 
       for (const link of links) {
