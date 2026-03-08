@@ -1,13 +1,35 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bookmark as BookmarkIcon, ArrowRight } from 'lucide-react';
+import { Bookmark as BookmarkIcon, ArrowRight, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { mockArticles } from '@/data/mockData';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function BookmarksPage() {
-  const bookmarked = mockArticles.filter(a => a.is_bookmarked);
+  const { data: bookmarked = [], isLoading } = useQuery({
+    queryKey: ['bookmarks'],
+    queryFn: async () => {
+      const { data: bookmarks, error } = await supabase
+        .from('bookmarks')
+        .select('id, created_at, article_id, articles(id, title, source_name, published_at, imported_at)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (bookmarks || []).map(b => ({
+        bookmark_id: b.id,
+        ...(b.articles as any),
+      }));
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="p-6 lg:p-8 max-w-7xl mx-auto flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
@@ -25,7 +47,7 @@ export default function BookmarksPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <SourceBadge name={article.source_name} />
                       <span className="text-xs text-muted-foreground">
-                        {new Date(article.published_at || '').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {new Date(article.published_at || article.imported_at || '').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
                     <h3 className="font-medium text-sm group-hover:text-primary transition-colors truncate">{article.title}</h3>
