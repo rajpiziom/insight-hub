@@ -187,6 +187,8 @@ export default function BriefingPage() {
     }))
     .filter(g => g.items.length > 0);
 
+  const totalItems = groupedByTheme.reduce((s, g) => s + g.items.length, 0);
+
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader
