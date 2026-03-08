@@ -342,7 +342,13 @@ serve(async (req) => {
 
       if (!articles || articles.length === 0) throw new Error("No articles found");
 
-      // Get the cluster info for context
+      // Also fetch briefing updates for this cluster (chronological)
+      const { data: briefingUpdates } = await supabase
+        .from("briefing_updates")
+        .select("title, summary, source_name, published_at")
+        .eq("cluster_id", clusterId)
+        .order("published_at", { ascending: true });
+
       const { data: cluster } = await supabase
         .from("event_clusters")
         .select("title, overview")
@@ -352,15 +358,20 @@ serve(async (req) => {
       const clusterMode = mode || "explain";
       const citationInstruction = `\n\nCRITICAL: After every factual claim, cite the source article using its number in square brackets, e.g. [1], [2]. Every bullet or sentence with a fact MUST have at least one citation. Multiple citations like [1][3] are fine.\n\nADDITIONALLY: After your main response, add a line "---QUOTES---" followed by a JSON ARRAY listing the quotes in the EXACT order the citations appear in the text, left-to-right, top-to-bottom. Each element: {"num": articleNumber, "quote": "exact verbatim 10-30 word quote from that article"}. If the same article [1] is cited 3 times in the text for 3 different facts, there must be 3 separate entries with different quotes. The total number of entries MUST equal the total number of citation markers in the text. The quotes MUST be copied verbatim from the article text so they can be found by text search.`;
 
+      // Build briefing context if available
+      const briefingContext = briefingUpdates && briefingUpdates.length > 0
+        ? `\n\nBriefing Updates (short wire-style notes, chronological — treat as additional source material alongside articles):\n${briefingUpdates.map((b, i) => `[Briefing ${i + 1}, ${b.published_at}] ${b.source_name}: ${b.summary}`).join('\n\n')}`
+        : '';
+
       if (clusterMode === "updates") {
-        systemPrompt = `You are a concise news wire editor. The reader ALREADY knows the background — do NOT explain what the event is. Give ONLY the latest developments as short, punchy bullet points (max 8 bullets total). Each bullet: one sentence, specific (names, dates, figures). End with 2-3 "What to watch" bullets on near-term outlook. Use markdown bullets (- ). No headings, no paragraphs, no preamble.` + citationInstruction;
+        systemPrompt = `You are a concise news wire editor. The reader ALREADY knows the background — do NOT explain what the event is. Give ONLY the latest developments as short, punchy bullet points (max 8 bullets total). Each bullet: one sentence, specific (names, dates, figures). Prioritize the MOST RECENT information first — newer developments before older ones. End with 2-3 "What to watch" bullets on near-term outlook. Use markdown bullets (- ). No headings, no paragraphs, no preamble. Use both full articles AND briefing updates as sources — the briefing updates often contain the very latest wire-style developments.` + citationInstruction;
       } else {
-        systemPrompt = `You are a senior intelligence briefing analyst. The reader is new to this story. Write a comprehensive explainer that covers: what is happening, why it matters, who the key players are, how we got here, and what the implications are. Write in clear, authoritative prose — not bullet points. The summary should be 3-5 paragraphs.` + citationInstruction;
+        systemPrompt = `You are a senior intelligence briefing analyst. The reader is new to this story. Write a comprehensive explainer that covers: what is happening, why it matters, who the key players are, how we got here, and what the implications are. Write in clear, authoritative prose — not bullet points. The summary should be 3-5 paragraphs. Incorporate information from both full articles AND briefing updates to give the most complete picture. Present events chronologically — start with the earliest context and build to the most recent developments.` + citationInstruction;
       }
 
       prompt = `Event: ${cluster?.title || "Unknown"}\n\nArticles (${articles.length} total, ordered chronologically):\n\n${articles.map((a, i) =>
         `--- [${i + 1}] ${a.source_name} | ${a.author || "Unknown"} | ${a.published_at || "undated"} ---\n"${a.title}"\nTags: ${(a.topic_tags || []).join(", ")}\n${(a.body_text || "").substring(0, 3000)}\n`
-      ).join("\n")}`;
+      ).join("\n")}${briefingContext}`;
 
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
