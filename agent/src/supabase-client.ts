@@ -43,7 +43,7 @@ export async function fetchSyncableSources(): Promise<SourceRow[]> {
     .eq('user_id', userId)
     .eq('auto_sync_enabled', true)
     .eq('is_active', true)
-    .in('source_type', ['browser_session_connector']);
+    .in('source_type', ['browser_session_connector', 'local_desktop_agent']);
 
   if (error) throw new Error(`Failed to fetch sources: ${error.message}`);
   return (data || []) as SourceRow[];
