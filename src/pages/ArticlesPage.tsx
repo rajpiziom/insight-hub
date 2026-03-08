@@ -19,6 +19,24 @@ export default function ArticlesPage() {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [topicFilter, setTopicFilter] = useState<string>('all');
+  const [tagging, setTagging] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleTagAll = async () => {
+    setTagging(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-analyze', {
+        body: { action: 'tag-batch' },
+      });
+      if (error) throw error;
+      toast.success(`Tagged ${data.tagged} of ${data.total} articles`);
+      queryClient.invalidateQueries({ queryKey: ['articles'] });
+    } catch (err: any) {
+      toast.error('Tagging failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setTagging(false);
+    }
+  };
 
   const { data: articles = [], isLoading } = useQuery({
     queryKey: ['articles'],
