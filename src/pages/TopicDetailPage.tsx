@@ -212,15 +212,21 @@ export default function TopicDetailPage() {
                 </div>
               ) : (activeMode === 'updates' && updatesText) ? (
                 <div className="space-y-1.5">
-                  {updatesText.split('\n').filter(l => l.trim()).map((line, i) => {
-                    const bullet = line.replace(/^[-*]\s*/, '');
-                    return (
-                      <div key={i} className="flex items-start gap-2 text-sm leading-relaxed text-foreground/90">
-                        <span className="text-muted-foreground mt-1 shrink-0">•</span>
-                        <span><CitedText text={bullet} articleIndex={articleIndex} /></span>
-                      </div>
-                    );
-                  })}
+                  {(() => {
+                    const lines = updatesText.split('\n').filter(l => l.trim());
+                    let offset = 0;
+                    return lines.map((line, i) => {
+                      const bullet = line.replace(/^[-*]\s*/, '');
+                      const el = (
+                        <div key={i} className="flex items-start gap-2 text-sm leading-relaxed text-foreground/90">
+                          <span className="text-muted-foreground mt-1 shrink-0">•</span>
+                          <span><CitedText text={bullet} articleIndex={articleIndex} citationQuotes={updatesQuotes} citationOffset={offset} /></span>
+                        </div>
+                      );
+                      offset += countCitations(bullet);
+                      return el;
+                    });
+                  })()}
                 </div>
               ) : null}
               {!loading && Object.keys(articleIndex).length > 0 && (
