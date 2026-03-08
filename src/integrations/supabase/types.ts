@@ -239,6 +239,50 @@ export type Database = {
           },
         ]
       }
+      briefing_updates: {
+        Row: {
+          cluster_id: string | null
+          content_hash: string
+          created_at: string
+          id: string
+          published_at: string
+          source_name: string
+          summary: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          cluster_id?: string | null
+          content_hash: string
+          created_at?: string
+          id?: string
+          published_at?: string
+          source_name?: string
+          summary: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          cluster_id?: string | null
+          content_hash?: string
+          created_at?: string
+          id?: string
+          published_at?: string
+          source_name?: string
+          summary?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "briefing_updates_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "event_clusters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string
