@@ -103,39 +103,61 @@ export default function TopicDetailPage() {
             ))}
           </div>
 
-          <Button variant="outline" size="sm" className="gap-1.5" disabled={summaryLoading} onClick={async () => {
-            if (eventSummary) { setShowSummary(!showSummary); return; }
-            setSummaryLoading(true);
-            setShowSummary(true);
-            try {
-              const { data, error } = await supabase.functions.invoke('ai-analyze', {
-                body: { action: 'summarize-cluster', clusterId: id },
-              });
-              if (error) throw error;
-              setEventSummary(data.summary);
-            } catch (err: any) {
-              toast.error('Failed: ' + (err.message || 'Unknown error'));
-              setShowSummary(false);
-            } finally {
-              setSummaryLoading(false);
-            }
-          }}>
-            {summaryLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            {summaryLoading ? 'Generating...' : showSummary ? 'Hide Summary' : 'AI Event Summary'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" disabled={loading} onClick={async () => {
+              if (explainText) { setActiveMode(activeMode === 'explain' ? null : 'explain'); return; }
+              setActiveMode('explain');
+              setLoading(true);
+              try {
+                const { data, error } = await supabase.functions.invoke('ai-analyze', {
+                  body: { action: 'summarize-cluster', clusterId: id, mode: 'explain' },
+                });
+                if (error) throw error;
+                setExplainText(data.summary);
+              } catch (err: any) {
+                toast.error(err.message || 'Failed');
+                setActiveMode(null);
+              } finally { setLoading(false); }
+            }}>
+              {loading && activeMode === 'explain' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {activeMode === 'explain' && explainText ? 'Hide Explainer' : 'Explain the Situation'}
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" disabled={loading} onClick={async () => {
+              if (updatesText) { setActiveMode(activeMode === 'updates' ? null : 'updates'); return; }
+              setActiveMode('updates');
+              setLoading(true);
+              try {
+                const { data, error } = await supabase.functions.invoke('ai-analyze', {
+                  body: { action: 'summarize-cluster', clusterId: id, mode: 'updates' },
+                });
+                if (error) throw error;
+                setUpdatesText(data.summary);
+              } catch (err: any) {
+                toast.error(err.message || 'Failed');
+                setActiveMode(null);
+              } finally { setLoading(false); }
+            }}>
+              {loading && activeMode === 'updates' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+              {activeMode === 'updates' && updatesText ? 'Hide Updates' : 'Latest Updates & Outlook'}
+            </Button>
+          </div>
 
-          {showSummary && (
+          {activeMode && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 p-5 rounded-xl bg-muted/50 border border-border">
-              {summaryLoading ? (
+              {loading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Synthesizing {articles.length} articles...
+                  <Loader2 className="w-4 h-4 animate-spin" /> {activeMode === 'explain' ? 'Writing explainer...' : 'Gathering latest updates...'}
                 </div>
-              ) : eventSummary ? (
+              ) : (activeMode === 'explain' && explainText) ? (
                 <div className="prose prose-sm max-w-none">
-                  {eventSummary.split('\n\n').map((p, i) => (
+                  {explainText.split('\n\n').map((p, i) => (
                     <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-3">{p}</p>
                   ))}
                 </div>
+              ) : (activeMode === 'updates' && updatesText) ? (
+                <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground/90 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-muted-foreground [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:uppercase [&_h3]:tracking-wider [&_h3]:text-muted-foreground [&_h3]:mt-4 [&_h3]:mb-2"
+                  dangerouslySetInnerHTML={{ __html: updatesText.replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^\* (.+)$/gm, '<li>$1</li>').replace(/^- (.+)$/gm, '<li>$1</li>').replace(/(<li>.*<\/li>\n?)+/gs, (m) => `<ul>${m}</ul>`) }}
+                />
               ) : null}
             </motion.div>
           )}

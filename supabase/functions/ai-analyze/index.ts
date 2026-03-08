@@ -349,7 +349,13 @@ serve(async (req) => {
         .eq("id", clusterId)
         .single();
 
-      systemPrompt = `You are a senior intelligence briefing analyst. Synthesize all the articles below into a comprehensive event summary. Structure it as a briefing that combines all perspectives, highlights the latest developments, identifies key players, and explains the implications. Write in clear, authoritative prose — not bullet points. Include a timeline of how the story evolved based on publication dates. The summary should be 3-5 paragraphs.`;
+      const clusterMode = mode || "explain";
+
+      if (clusterMode === "updates") {
+        systemPrompt = `You are a senior news analyst. The reader already understands the background of this event. Give them a concise bullet-pointed briefing of the LATEST developments, new information, and forward-looking analysis only. Format as markdown bullet points grouped under clear headings like "Latest Developments", "Key Reactions", "What to Watch Next", "Market/Policy Implications". Be specific with dates, names, and figures. No background explanation needed.`;
+      } else {
+        systemPrompt = `You are a senior intelligence briefing analyst. The reader is new to this story. Write a comprehensive explainer that covers: what is happening, why it matters, who the key players are, how we got here, and what the implications are. Write in clear, authoritative prose — not bullet points. The summary should be 3-5 paragraphs.`;
+      }
 
       prompt = `Event: ${cluster?.title || "Unknown"}\n\nArticles (${articles.length} total, ordered chronologically):\n\n${articles.map((a, i) =>
         `--- [${i + 1}] ${a.source_name} | ${a.author || "Unknown"} | ${a.published_at || "undated"} ---\n"${a.title}"\nTags: ${(a.topic_tags || []).join(", ")}\n${(a.body_text || "").substring(0, 3000)}\n`
