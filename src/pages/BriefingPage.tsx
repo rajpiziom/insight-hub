@@ -11,13 +11,31 @@ import { fetchBriefing, generateBriefing } from '@/lib/api';
 import { toast } from 'sonner';
 import type { DailyBriefing, BriefingContent } from '@/types';
 
-/** Shorten a title to fit ~60 chars while keeping meaning */
-function shortenTitle(title: string, max = 60): string {
+// Client-side noise filter for items that slipped through
+const CLIENT_NOISE = [
+  /subscribe/i, /sign\s*up/i, /free trial/i, /newsletter/i,
+  /log\s*in/i, /mind-expanding/i, /delivered\s+(six|five|seven)\s+days/i,
+  /curated\s+news/i, /direct\s+to\s+your\s+inbox/i,
+  /behind\s+the\s+scenes/i, /future[- ]gazing/i,
+  /predictions\s+and\s+speculation/i, /tune\s+into\s+captivating/i,
+  /registered\s+in\s+england/i, /registered\s+office/i,
+  /vat\s+reg/i, /newspaper\s+limited/i, /word\s+of\s+the\s+week/i,
+  /copyright\s*©/i, /all\s+rights\s+reserved/i,
+  /terms\s+of\s+(use|service)/i, /privacy\s+policy/i, /cookie\s+policy/i,
+  /©\s*\d{4}/, /the\s+economist\s+newspaper/i,
+  /john\s+adam\s+street/i, /adelphi/i,
+];
+
+function isClientNoise(text: string): boolean {
+  return CLIENT_NOISE.some(p => p.test(text));
+}
+
+/** Shorten a title to fit ~45 chars while keeping meaning */
+function shortenTitle(title: string, max = 45): string {
   if (title.length <= max) return title;
-  // Try to cut at a word boundary
   const trimmed = title.slice(0, max);
   const lastSpace = trimmed.lastIndexOf(' ');
-  return (lastSpace > max * 0.5 ? trimmed.slice(0, lastSpace) : trimmed) + '…';
+  return (lastSpace > max * 0.4 ? trimmed.slice(0, lastSpace) : trimmed) + '…';
 }
 
 function BriefingTile({ item, index }: { item: any; index: number }) {
