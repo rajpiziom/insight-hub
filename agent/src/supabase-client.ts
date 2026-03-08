@@ -96,7 +96,43 @@ export async function fetchUningestedUrls(sourceId: string, limit: number) {
   return data || [];
 }
 
-export async function insertArticle(sourceId: string, article: {
+export async function fetchShortArticles(threshold: number, limit: number) {
+  const { supabase, userId } = await getSupabase();
+  const { data, error } = await supabase
+    .from('articles')
+    .select('id, title, canonical_url, body_text')
+    .eq('user_id', userId)
+    .order('published_at', { ascending: false })
+    .limit(limit * 3); // fetch extra to filter client-side
+  if (error) throw new Error(`Failed to fetch articles: ${error.message}`);
+  return (data || [])
+    .filter(a => !a.body_text || a.body_text.length < threshold)
+    .slice(0, limit)
+    .map(a => ({ ...a, body_text_length: a.body_text?.length || 0 }));
+}
+
+export async function updateArticleBody(articleId: string, extracted: {
+  body_text: string;
+  subtitle?: string;
+  author?: string;
+  hero_image_url?: string;
+  content_hash: string;
+}) {
+  const { supabase } = await getSupabase();
+  const { error } = await supabase
+    .from('articles')
+    .update({
+      body_text: extracted.body_text,
+      subtitle: extracted.subtitle || undefined,
+      author: extracted.author || undefined,
+      hero_image_url: extracted.hero_image_url || undefined,
+      content_hash: extracted.content_hash,
+    })
+    .eq('id', articleId);
+  if (error) console.error(`  ✗ Update failed: ${error.message}`);
+}
+
+
   canonical_url: string;
   title: string;
   subtitle?: string;

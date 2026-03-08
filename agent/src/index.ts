@@ -7,6 +7,8 @@ import {
   insertDiscoveredUrl,
   insertArticle,
   fetchUningestedUrls,
+  fetchShortArticles,
+  updateArticleBody,
   createSyncRun,
   completeSyncRun,
   updateSourceSyncStatus,
@@ -160,18 +162,46 @@ program
   });
 
 program
-  .command('daemon')
-  .description('Run continuously on a schedule')
-  .action(async () => {
-    console.log(`🔄 Running as daemon (every ${config.syncIntervalMinutes} minutes)\n`);
-    await runOnce();
+  .command('re-extract')
+  .description('Re-extract articles with short body text (< threshold chars)')
+  .option('-l, --limit <n>', 'Max articles to re-extract', '5')
+  .option('-t, --threshold <n>', 'Body text char threshold', '1500')
+  .action(async (opts) => {
+    validateConfig();
+    const limit = parseInt(opts.limit);
+    const threshold = parseInt(opts.threshold);
+    console.log(`🔄 Re-extracting articles shorter than ${threshold} chars (limit: ${limit})\n`);
 
-    setInterval(async () => {
-      console.log(`\n\n${'─'.repeat(50)}`);
-      console.log(`⏰ Scheduled sync at ${new Date().toLocaleString()}`);
-      console.log(`${'─'.repeat(50)}`);
-      await runOnce();
-    }, config.syncIntervalMinutes * 60 * 1000);
+    try {
+      const articles = await fetchShortArticles(threshold, limit);
+      if (articles.length === 0) {
+        console.log('No short articles found. All good!');
+        return;
+      }
+
+      console.log(`Found ${articles.length} article(s) to re-extract:\n`);
+      let updated = 0;
+
+      for (const art of articles) {
+        try {
+          const extracted = await extractArticle(art.canonical_url);
+          if (extracted && extracted.body_text.length > (art.body_text_length || 0)) {
+            await updateArticleBody(art.id, extracted);
+            updated++;
+            console.log(`    ✓ Updated: "${art.title}" (${art.body_text_length} → ${extracted.body_text.length} chars)`);
+          } else {
+            console.log(`    ⊘ No improvement for: "${art.title}"`);
+          }
+          await new Promise(r => setTimeout(r, 1500));
+        } catch (err: any) {
+          console.error(`    ✗ Failed: ${err.message}`);
+        }
+      }
+
+      console.log(`\n✅ Re-extraction complete: ${updated} updated`);
+    } finally {
+      await closeBrowser();
+    }
   });
 
 program.parse();

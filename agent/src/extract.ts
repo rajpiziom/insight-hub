@@ -16,8 +16,7 @@ export interface ExtractedArticle {
 }
 
 /**
- * Fetch and extract a full article from The Economist
- * using the user's authenticated browser session.
+ * Extract article content using Playwright's live DOM (handles JS-rendered content)
  */
 export async function extractArticle(url: string): Promise<ExtractedArticle | null> {
   console.log(`  📄 Extracting: ${url}`);
@@ -26,50 +25,124 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
 
   try {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
-    // Scroll to trigger lazy-loaded content
-    await page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight / 2);
-    });
-    await page.waitForTimeout(2000);
-    await page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-    });
-    await page.waitForTimeout(2000);
 
-    const html = await page.content();
-    const $ = cheerio.load(html);
+    // Scroll through the page to trigger lazy loading
+    await page.evaluate(async () => {
+      const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+      const h = document.body.scrollHeight;
+      for (let y = 0; y < h; y += 500) {
+        window.scrollTo(0, y);
+        await delay(200);
+      }
+      window.scrollTo(0, 0);
+    });
+    await page.waitForTimeout(1500);
 
-    const title = extractTitle($);
-    if (!title) {
+    // Extract directly from the live rendered DOM via Playwright
+    const extracted = await page.evaluate(() => {
+      // Helper: get text from an element
+      const getText = (sel: string) => document.querySelector(sel)?.textContent?.trim() || '';
+      const getAttr = (sel: string, attr: string) => document.querySelector(sel)?.getAttribute(attr) || '';
+
+      // Title
+      const title =
+        getText('article h1') ||
+        getText('h1') ||
+        getAttr('meta[property="og:title"]', 'content');
+
+      // Subtitle
+      const subtitle =
+        getText('article h2') ||
+        getText('.article__description') ||
+        getAttr('meta[property="og:description"]', 'content') || '';
+
+      // Author
+      const author =
+        getText('[data-test-id="author-name"]') ||
+        getAttr('meta[name="author"]', 'content') ||
+        getText('.article__author') || '';
+
+      // Published date
+      const publishedAt =
+        getAttr('meta[property="article:published_time"]', 'content') ||
+        document.querySelector('time[datetime]')?.getAttribute('datetime') || '';
+
+      // Hero image
+      const heroImage =
+        getAttr('meta[property="og:image"]', 'content') ||
+        (document.querySelector('article figure img') as HTMLImageElement)?.src || '';
+
+      // Body text - the critical part
+      // First remove unwanted elements
+      const article = document.querySelector('article');
+      if (article) {
+        article.querySelectorAll(
+          'nav, footer, header, script, style, ' +
+          '.advert, .newsletter-signup, .newsletter-promo, ' +
+          '.related-articles, .article__aside, .aside, ' +
+          '.recommended, .teaser, [role="complementary"], ' +
+          '[role="navigation"], .sticky-nav, .article-links, ' +
+          '[data-test-id="related-content"], [data-test-id="newsletter-signup"]'
+        ).forEach(el => el.remove());
+      }
+
+      // Try multiple strategies to get body paragraphs
+      const bodySelectors = [
+        'article [data-component="body"] p',
+        'article .article__body p',
+        'article [data-body-id] p',
+        'article .layout-article-body p',
+        '.article__body-text p',
+        '[data-test-id="article-body"] p',
+        'article p',
+      ];
+
+      let bodyText = '';
+      for (const sel of bodySelectors) {
+        const ps = document.querySelectorAll(sel);
+        if (ps.length >= 2) {
+          const text = Array.from(ps)
+            .map(p => p.textContent?.trim() || '')
+            .filter(t => t.length > 30) // skip captions/labels
+            .join('\n\n');
+          if (text.length > bodyText.length) {
+            bodyText = text;
+          }
+        }
+      }
+
+      return { title, subtitle, author, publishedAt, heroImage, bodyText };
+    });
+
+    if (!extracted.title) {
       console.warn('    ⚠ Could not extract title');
       return null;
     }
 
-    const bodyText = extractBodyText($);
-    if (!bodyText || bodyText.length < 200) {
-      console.warn(`    ⚠ Article appears paywalled or empty (${bodyText?.length || 0} chars)`);
+    if (!extracted.bodyText || extracted.bodyText.length < 200) {
+      console.warn(`    ⚠ Article appears paywalled or empty (${extracted.bodyText?.length || 0} chars)`);
       console.warn(`    Make sure you're logged into economist.com in your browser`);
       return null;
     }
 
     const contentHash = createHash('sha256')
-      .update(title + bodyText.slice(0, 500))
+      .update(extracted.title + extracted.bodyText.slice(0, 500))
       .digest('hex');
 
     const article: ExtractedArticle = {
       canonical_url: url,
-      title,
-      subtitle: extractSubtitle($),
-      author: extractAuthor($),
-      body_text: bodyText,
-      published_at: extractPublishedAt($),
-      hero_image_url: extractHeroImage($),
+      title: extracted.title,
+      subtitle: extracted.subtitle || undefined,
+      author: extracted.author || undefined,
+      body_text: extracted.bodyText,
+      published_at: extracted.publishedAt || undefined,
+      hero_image_url: extracted.heroImage || undefined,
       section: extractSection(url),
       content_hash: contentHash,
       source_name: 'The Economist',
     };
 
-    console.log(`    ✓ Extracted: "${title}" (${bodyText.length} chars)`);
+    console.log(`    ✓ Extracted: "${extracted.title}" (${extracted.bodyText.length} chars)`);
     return article;
 
   } catch (err: any) {
@@ -78,110 +151,6 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
   } finally {
     await page.close();
   }
-}
-
-function extractTitle($: cheerio.CheerioAPI): string | null {
-  return (
-    $('article h1').first().text().trim() ||
-    $('h1.article__headline').first().text().trim() ||
-    $('[data-test-id="headline"]').first().text().trim() ||
-    $('meta[property="og:title"]').attr('content')?.trim() ||
-    $('title').text().split('|')[0].trim() ||
-    null
-  );
-}
-
-function extractSubtitle($: cheerio.CheerioAPI): string | undefined {
-  return (
-    $('article h2').first().text().trim() ||
-    $('.article__description').first().text().trim() ||
-    $('[data-test-id="rubric"]').first().text().trim() ||
-    $('meta[property="og:description"]').attr('content')?.trim() ||
-    undefined
-  );
-}
-
-function extractAuthor($: cheerio.CheerioAPI): string | undefined {
-  return (
-    $('[data-test-id="author-name"]').text().trim() ||
-    $('meta[name="author"]').attr('content')?.trim() ||
-    $('.article__author').text().trim() ||
-    $('[itemprop="author"]').text().trim() ||
-    undefined
-  );
-}
-
-function extractBodyText($: cheerio.CheerioAPI): string {
-  // Remove all unwanted elements before extraction
-  $(
-    'script, style, nav, footer, header, ' +
-    '.advert, .newsletter-signup, .newsletter-promo, ' +
-    '.related-articles, .article__aside, .aside, ' +
-    '.recommended, .teaser, .ds-layout-grid--edged, ' +
-    '[data-test-id="related-content"], ' +
-    '[data-test-id="newsletter-signup"], ' +
-    '[role="complementary"], [role="navigation"], ' +
-    '.sticky-nav, .article-links, .article__footnote, ' +
-    '.layout-article-links, .article__lead-image'
-  ).remove();
-
-  // Try specific Economist article body selectors
-  const selectors = [
-    'article [data-component="body"] p',
-    'article .article__body p',
-    'article [data-body-id] p',
-    'article .layout-article-body p',
-    '.article__body-text p',
-    '[data-test-id="article-body"] p',
-  ];
-
-  for (const selector of selectors) {
-    const paragraphs = $(selector);
-    if (paragraphs.length >= 2) {
-      const text = paragraphs
-        .map((_, el) => $(el).text().trim())
-        .get()
-        .filter(p => p.length > 30) // filter out captions/labels
-        .join('\n\n');
-      if (text.length > 300) {
-        return text;
-      }
-    }
-  }
-
-  // Broader fallback: all <p> inside <article>, filtering short ones
-  const articlePs = $('article p');
-  if (articlePs.length >= 2) {
-    const text = articlePs
-      .map((_, el) => $(el).text().trim())
-      .get()
-      .filter(p => p.length > 40)
-      .join('\n\n');
-    if (text.length > 300) {
-      return text;
-    }
-  }
-
-  // Last resort: grab all text from article tag
-  const raw = $('article').text().trim();
-  return raw.replace(/\s{2,}/g, '\n\n').trim();
-}
-
-function extractPublishedAt($: cheerio.CheerioAPI): string | undefined {
-  const dateStr =
-    $('meta[property="article:published_time"]').attr('content') ||
-    $('time[datetime]').first().attr('datetime') ||
-    $('[data-test-id="published-date"]').attr('datetime');
-  return dateStr || undefined;
-}
-
-function extractHeroImage($: cheerio.CheerioAPI): string | undefined {
-  return (
-    $('meta[property="og:image"]').attr('content') ||
-    $('article figure img').first().attr('src') ||
-    $('article picture source').first().attr('srcset')?.split(',')[0]?.trim()?.split(' ')[0] ||
-    undefined
-  );
 }
 
 function extractSection(url: string): string | undefined {
