@@ -17,9 +17,10 @@ function formatTime(dateStr: string) {
 export default function TopicDetailPage() {
   const { id } = useParams();
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [eventSummary, setEventSummary] = useState<string | null>(null);
-  const [showSummary, setShowSummary] = useState(false);
+  const [activeMode, setActiveMode] = useState<'explain' | 'updates' | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [explainText, setExplainText] = useState<string | null>(null);
+  const [updatesText, setUpdatesText] = useState<string | null>(null);
 
   const { data: cluster, isLoading: clusterLoading } = useQuery({
     queryKey: ['cluster', id],
