@@ -352,7 +352,7 @@ serve(async (req) => {
       const clusterMode = mode || "explain";
 
       if (clusterMode === "updates") {
-        systemPrompt = `You are a senior news analyst. The reader already understands the background of this event. Give them a concise bullet-pointed briefing of the LATEST developments, new information, and forward-looking analysis only. Format as markdown bullet points grouped under clear headings like "Latest Developments", "Key Reactions", "What to Watch Next", "Market/Policy Implications". Be specific with dates, names, and figures. No background explanation needed.`;
+        systemPrompt = `You are a concise news wire editor. The reader ALREADY knows the background — do NOT explain what the event is. Give ONLY the latest developments as short, punchy bullet points (max 8 bullets total). Each bullet: one sentence, specific (names, dates, figures). End with 2-3 "What to watch" bullets on near-term outlook. Use markdown bullets (- ). No headings, no paragraphs, no preamble.`;
       } else {
         systemPrompt = `You are a senior intelligence briefing analyst. The reader is new to this story. Write a comprehensive explainer that covers: what is happening, why it matters, who the key players are, how we got here, and what the implications are. Write in clear, authoritative prose — not bullet points. The summary should be 3-5 paragraphs.`;
       }
