@@ -9,7 +9,56 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-function formatDate(dateStr: string) {
+function HighlightedBody({ bodyText, highlight, bodyRef }: { bodyText: string; highlight: string | null; bodyRef: React.RefObject<HTMLDivElement | null> }) {
+  const highlightRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (highlight && highlightRef.current) {
+      setTimeout(() => {
+        highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  }, [highlight]);
+
+  const paragraphs = bodyText.split('\n\n');
+
+  if (!highlight) {
+    return (
+      <div className="prose prose-sm max-w-none" ref={bodyRef}>
+        {paragraphs.map((p, i) => (
+          <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-4">{p}</p>
+        ))}
+      </div>
+    );
+  }
+
+  // Find and highlight the matching text (case-insensitive fuzzy match)
+  const lowerHighlight = highlight.toLowerCase();
+
+  return (
+    <div className="prose prose-sm max-w-none" ref={bodyRef}>
+      {paragraphs.map((paragraph, i) => {
+        const lowerParagraph = paragraph.toLowerCase();
+        const matchIdx = lowerParagraph.indexOf(lowerHighlight);
+        if (matchIdx === -1) {
+          return <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-4">{paragraph}</p>;
+        }
+        const before = paragraph.substring(0, matchIdx);
+        const matched = paragraph.substring(matchIdx, matchIdx + highlight.length);
+        const after = paragraph.substring(matchIdx + highlight.length);
+        return (
+          <p key={i} className="text-sm leading-relaxed text-foreground/90 mb-4">
+            {before}
+            <span ref={highlightRef} className="bg-warning/30 text-foreground rounded px-0.5 py-0.5 ring-2 ring-warning/50">{matched}</span>
+            {after}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+
   return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
