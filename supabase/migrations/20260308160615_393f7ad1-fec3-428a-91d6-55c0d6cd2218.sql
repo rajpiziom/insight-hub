@@ -1,0 +1,1 @@
+UPDATE sources SET article_count = 93 WHERE source_name = 'The Economist';
