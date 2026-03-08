@@ -39,41 +39,33 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
     await page.waitForTimeout(1500);
 
     // Extract directly from the live rendered DOM via Playwright
-    const extracted = await page.evaluate(() => {
-      // Helper: get text from an element
-      const getText = (sel: string) => document.querySelector(sel)?.textContent?.trim() || '';
-      const getAttr = (sel: string, attr: string) => document.querySelector(sel)?.getAttribute(attr) || '';
+    const extracted = await page.evaluate(`(() => {
+      const getText = sel => { const el = document.querySelector(sel); return el ? el.textContent.trim() : ''; };
+      const getAttr = (sel, attr) => { const el = document.querySelector(sel); return el ? (el.getAttribute(attr) || '') : ''; };
 
-      // Title
       const title =
         getText('article h1') ||
         getText('h1') ||
         getAttr('meta[property="og:title"]', 'content');
 
-      // Subtitle
       const subtitle =
         getText('article h2') ||
         getText('.article__description') ||
         getAttr('meta[property="og:description"]', 'content') || '';
 
-      // Author
       const author =
         getText('[data-test-id="author-name"]') ||
         getAttr('meta[name="author"]', 'content') ||
         getText('.article__author') || '';
 
-      // Published date
       const publishedAt =
         getAttr('meta[property="article:published_time"]', 'content') ||
-        document.querySelector('time[datetime]')?.getAttribute('datetime') || '';
+        (document.querySelector('time[datetime]') ? document.querySelector('time[datetime]').getAttribute('datetime') : '') || '';
 
-      // Hero image
       const heroImage =
         getAttr('meta[property="og:image"]', 'content') ||
-        (document.querySelector('article figure img') as HTMLImageElement)?.src || '';
+        (document.querySelector('article figure img') ? document.querySelector('article figure img').src : '') || '';
 
-      // Body text - the critical part
-      // First remove unwanted elements
       const article = document.querySelector('article');
       if (article) {
         article.querySelectorAll(
@@ -86,7 +78,6 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
         ).forEach(el => el.remove());
       }
 
-      // Try multiple strategies to get body paragraphs
       const bodySelectors = [
         'article [data-component="body"] p',
         'article .article__body p',
@@ -102,9 +93,9 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
         const ps = document.querySelectorAll(sel);
         if (ps.length >= 2) {
           const text = Array.from(ps)
-            .map(p => p.textContent?.trim() || '')
-            .filter(t => t.length > 30) // skip captions/labels
-            .join('\n\n');
+            .map(p => (p.textContent || '').trim())
+            .filter(t => t.length > 30)
+            .join('\\n\\n');
           if (text.length > bodyText.length) {
             bodyText = text;
           }
@@ -112,7 +103,7 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
       }
 
       return { title, subtitle, author, publishedAt, heroImage, bodyText };
-    });
+    })()`) as { title: string; subtitle: string; author: string; publishedAt: string; heroImage: string; bodyText: string };
 
     if (!extracted.title) {
       console.warn('    ⚠ Could not extract title');
