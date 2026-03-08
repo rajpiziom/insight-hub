@@ -16,9 +16,8 @@ import BookmarksPage from "./pages/BookmarksPage";
 import SearchPage from "./pages/SearchPage";
 import SettingsPage from "./pages/SettingsPage";
 import ChatPage from "./pages/ChatPage";
-import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
-import { useAuth } from "./hooks/useAuth";
+import { useAutoAuth } from "./hooks/useAutoAuth";
 import { useEffect } from "react";
 
 const queryClient = new QueryClient();
@@ -30,22 +29,48 @@ function DarkModeInit() {
   return null;
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+function AppWithAuth() {
+  const { user, loading } = useAutoAuth();
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <div className="text-center space-y-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Initializing...</p>
+        </div>
       </div>
     );
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-3">
+          <p className="text-sm text-destructive">Failed to initialize. Please refresh.</p>
+        </div>
+      </div>
+    );
   }
 
-  return <>{children}</>;
+  return (
+    <Routes>
+      <Route path="/" element={<AppLayout><Index /></AppLayout>} />
+      <Route path="/articles" element={<AppLayout><ArticlesPage /></AppLayout>} />
+      <Route path="/articles/:id" element={<AppLayout><ArticleViewPage /></AppLayout>} />
+      <Route path="/topics" element={<AppLayout><TopicsPage /></AppLayout>} />
+      <Route path="/topics/:id" element={<AppLayout><TopicDetailPage /></AppLayout>} />
+      <Route path="/briefing" element={<AppLayout><BriefingPage /></AppLayout>} />
+      <Route path="/sources" element={<AppLayout><SourcesPage /></AppLayout>} />
+      <Route path="/sources/:id" element={<AppLayout><SourceDetailPage /></AppLayout>} />
+      <Route path="/bookmarks" element={<AppLayout><BookmarksPage /></AppLayout>} />
+      <Route path="/search" element={<AppLayout><SearchPage /></AppLayout>} />
+      <Route path="/settings" element={<AppLayout><SettingsPage /></AppLayout>} />
+      <Route path="/chat" element={<AppLayout><ChatPage /></AppLayout>} />
+      <Route path="/auth" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
 }
 
 const App = () => (
@@ -55,22 +80,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/auth" element={<AuthPage />} />
-          <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
-          <Route path="/articles" element={<ProtectedRoute><AppLayout><ArticlesPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/articles/:id" element={<ProtectedRoute><AppLayout><ArticleViewPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/topics" element={<ProtectedRoute><AppLayout><TopicsPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/topics/:id" element={<ProtectedRoute><AppLayout><TopicDetailPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/briefing" element={<ProtectedRoute><AppLayout><BriefingPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/sources" element={<ProtectedRoute><AppLayout><SourcesPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/sources/:id" element={<ProtectedRoute><AppLayout><SourceDetailPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/bookmarks" element={<ProtectedRoute><AppLayout><BookmarksPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/search" element={<ProtectedRoute><AppLayout><SearchPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><AppLayout><SettingsPage /></AppLayout></ProtectedRoute>} />
-          <Route path="/chat" element={<ProtectedRoute><AppLayout><ChatPage /></AppLayout></ProtectedRoute>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppWithAuth />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
