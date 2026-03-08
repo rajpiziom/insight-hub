@@ -156,9 +156,9 @@ export default function TopicDetailPage() {
                   ))}
                 </div>
               ) : (activeMode === 'updates' && updatesText) ? (
-                <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground/90 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:uppercase [&_h2]:tracking-wider [&_h2]:text-muted-foreground [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:uppercase [&_h3]:tracking-wider [&_h3]:text-muted-foreground [&_h3]:mt-4 [&_h3]:mb-2"
-                  dangerouslySetInnerHTML={{ __html: updatesText.replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^\* (.+)$/gm, '<li>$1</li>').replace(/^- (.+)$/gm, '<li>$1</li>').replace(/(<li>.*<\/li>\n?)+/gs, (m) => `<ul>${m}</ul>`) }}
-                />
+                <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground/90">
+                  <ReactMarkdown>{updatesText}</ReactMarkdown>
+                </div>
               ) : null}
             </motion.div>
           )}
