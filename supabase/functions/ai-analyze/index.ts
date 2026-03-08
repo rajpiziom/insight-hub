@@ -10,7 +10,8 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { action, articleId, clusterId, userId, mode } = await req.json();
+    const reqBody = await req.json();
+    const { action, articleId, clusterId, userId, mode, items: classifyItems, clusters: classifyClusters } = reqBody;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -414,6 +415,103 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ success: true, summary: cleanSummary, articleIndex, citationQuotes }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
+    } else if (action === "classify") {
+      // AI-based classification: assigns theme + matches to event clusters
+      // Input: items = [{ id, title, summary }], clusters = [{ id, title, short_title, top_keywords, top_entities }]
+      if (!classifyItems || !Array.isArray(classifyItems) || classifyItems.length === 0) {
+        throw new Error("No items provided for classification");
+      }
+
+      const themes = ["Geopolitics", "Markets", "Macro", "Technology", "Energy", "Business", "Policy", "Other"];
+      const clusterDescriptions = (classifyClusters || []).map((c: any, i: number) =>
+        `[Cluster ${i}] ID: ${c.id} | "${c.title}" (short: ${c.short_title || 'N/A'}) | Keywords: ${(c.top_keywords || []).join(', ')} | Entities: ${(c.top_entities || []).join(', ')}`
+      ).join('\n');
+
+      const itemDescriptions = classifyItems.map((item: any, i: number) =>
+        `[Item ${i}] ID: ${item.id || i}\nTitle: ${item.title}\nSummary: ${(item.summary || '').substring(0, 500)}`
+      ).join('\n\n---\n\n');
+
+      const classifySystemPrompt = `You are a news intelligence classifier. For each item, determine:
+1. The best THEME from this list: ${themes.join(', ')}
+2. The best matching EVENT CLUSTER (if any) from the existing clusters below. Only match if the item is clearly about that specific event/story. If no cluster matches, use null.
+
+${clusterDescriptions ? `EXISTING EVENT CLUSTERS:\n${clusterDescriptions}` : 'No existing clusters.'}`;
+
+      const classifyPrompt = `Classify each of these items:\n\n${itemDescriptions}`;
+
+      // Use tool calling for structured output
+      const classifyBody: Record<string, unknown> = {
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: classifySystemPrompt },
+          { role: "user", content: classifyPrompt },
+        ],
+        tools: [{
+          type: "function",
+          function: {
+            name: "classify_items",
+            description: "Return classification results for each item",
+            parameters: {
+              type: "object",
+              properties: {
+                classifications: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      item_id: { type: "string", description: "The item ID or index" },
+                      theme: { type: "string", enum: themes, description: "The assigned theme category" },
+                      cluster_id: { type: "string", description: "The matched cluster ID, or null if no match" },
+                      confidence: { type: "number", description: "Confidence score 0-1" },
+                    },
+                    required: ["item_id", "theme"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["classifications"],
+              additionalProperties: false,
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "classify_items" } },
+      };
+
+      const classifyResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(classifyBody),
+      });
+
+      if (!classifyResponse.ok) {
+        const text = await classifyResponse.text();
+        throw new Error(`AI gateway error [${classifyResponse.status}]: ${text}`);
+      }
+
+      const classifyData = await classifyResponse.json();
+      const toolCall = classifyData.choices?.[0]?.message?.tool_calls?.[0];
+      let classifications: any[] = [];
+      
+      if (toolCall) {
+        try {
+          const parsed = JSON.parse(toolCall.function.arguments);
+          classifications = parsed.classifications || [];
+        } catch {
+          // Try parsing as the result wrapper
+          try {
+            const inner = JSON.parse(JSON.parse(toolCall.function.arguments).result);
+            classifications = inner.classifications || [];
+          } catch {}
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, classifications }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

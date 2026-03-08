@@ -164,71 +164,105 @@ async function syncBriefings() {
   // Fetch clusters once for matching
   const clusters = await fetchRecentClusters();
 
+  // Collect all briefing items first
+  const rawItems: { source: string; item: any }[] = [];
+
   for (const { source, url } of briefingUrls) {
     const items = await scrapeBriefing(url);
     if (items.length === 0) continue;
-
     for (const item of items) {
-      // Match to clusters using keywords, entities, and title phrases
-      let matchedClusterId: string | undefined;
-      let bestMatchScore = 0;
-      const itemLower = (item.title + ' ' + item.summary).toLowerCase();
+      rawItems.push({ source, item });
+    }
+  }
 
-      for (const cluster of clusters) {
-        const keywords = (cluster.top_keywords || []).map((k: string) => k.toLowerCase());
-        const entities = (cluster.top_entities || []).map((e: string) => e.toLowerCase());
-        const clusterTitle = (cluster.short_title || cluster.title).toLowerCase();
-        const titleWords = clusterTitle.split(/\s+/).filter((w: string) => w.length > 3);
+  if (rawItems.length === 0) {
+    console.log(`\n⚠ No briefing items scraped`);
+    return;
+  }
 
-        // Score: keyword/entity individual matches
-        let score = 0;
-        for (const kw of keywords) {
-          if (itemLower.includes(kw)) score += 1;
-        }
-        for (const ent of entities) {
-          if (itemLower.includes(ent)) score += 1.5; // entities are stronger signals
-        }
-        for (const tw of titleWords) {
-          if (itemLower.includes(tw)) score += 0.5;
-        }
+  // Use AI to classify all items at once
+  console.log(`\n🤖 Classifying ${rawItems.length} briefing items with AI...`);
 
-        // Bonus: if cluster title appears as a phrase (partial)
-        const titleParts = clusterTitle.split(/[:\-–—,]/).map((p: string) => p.trim()).filter((p: string) => p.length > 5);
-        for (const part of titleParts) {
-          if (itemLower.includes(part)) score += 3;
-        }
+  let classifications: Record<string, { theme: string; cluster_id: string | null }> = {};
 
-        if (score >= 1.5 && score > bestMatchScore) {
-          bestMatchScore = score;
-          matchedClusterId = cluster.id;
+  try {
+    const classifyPayload = {
+      action: 'classify',
+      items: rawItems.map((r, i) => ({
+        id: String(i),
+        title: r.item.title,
+        summary: r.item.summary,
+      })),
+      clusters: clusters.map(c => ({
+        id: c.id,
+        title: c.title,
+        short_title: c.short_title,
+        top_keywords: c.top_keywords,
+        top_entities: c.top_entities,
+      })),
+    };
+
+    const response = await fetch(`${config.supabaseUrl}/functions/v1/ai-analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.supabaseAnonKey}`,
+      },
+      body: JSON.stringify(classifyPayload),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.classifications && Array.isArray(data.classifications)) {
+        for (const c of data.classifications) {
+          classifications[String(c.item_id)] = {
+            theme: c.theme || 'Other',
+            cluster_id: c.cluster_id && c.cluster_id !== 'null' ? c.cluster_id : null,
+          };
         }
+        console.log(`  ✓ AI classified ${Object.keys(classifications).length} items`);
       }
+    } else {
+      const errText = await response.text();
+      console.warn(`  ⚠ AI classification failed (${response.status}): ${errText}`);
+      console.warn(`  Falling back to keyword classification...`);
+    }
+  } catch (err: any) {
+    console.warn(`  ⚠ AI classification error: ${err.message}`);
+    console.warn(`  Falling back to keyword classification...`);
+  }
 
-      // If matched to a cluster, also insert as a briefing_update
-      if (matchedClusterId) {
-        await upsertBriefingUpdate({
-          cluster_id: matchedClusterId,
-          title: item.title,
-          summary: item.summary,
-          source_name: source,
-          content_hash: item.content_hash,
-        });
-      }
+  // Process items using AI classifications (or fallback to keyword-based theme from briefing.ts)
+  for (let i = 0; i < rawItems.length; i++) {
+    const { source, item } = rawItems[i];
+    const aiResult = classifications[String(i)];
+    const theme = aiResult?.theme || item.theme; // item.theme is the keyword-based fallback
+    const matchedClusterId = aiResult?.cluster_id || undefined;
 
-      // Group by theme for daily briefing
-      let themeGroup = allItems.find(g => g.theme === item.theme);
-      if (!themeGroup) {
-        themeGroup = { theme: item.theme, items: [] };
-        allItems.push(themeGroup);
-      }
-      themeGroup.items.push({
+    // If matched to a cluster, insert as a briefing_update
+    if (matchedClusterId) {
+      await upsertBriefingUpdate({
+        cluster_id: matchedClusterId,
         title: item.title,
         summary: item.summary,
-        why_it_matters: '',
-        sources: item.sources,
-        cluster_id: matchedClusterId,
+        source_name: source,
+        content_hash: item.content_hash,
       });
     }
+
+    // Group by theme for daily briefing
+    let themeGroup = allItems.find(g => g.theme === theme);
+    if (!themeGroup) {
+      themeGroup = { theme, items: [] };
+      allItems.push(themeGroup);
+    }
+    themeGroup.items.push({
+      title: item.title,
+      summary: item.summary,
+      why_it_matters: '',
+      sources: item.sources,
+      cluster_id: matchedClusterId,
+    });
   }
 
   if (allItems.length > 0) {
