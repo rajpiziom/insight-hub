@@ -385,7 +385,13 @@ serve(async (req) => {
       const data = await response.json();
       const summary = data.choices?.[0]?.message?.content || "";
 
-      return new Response(JSON.stringify({ success: true, summary }), {
+      // Build article index mapping: number -> { id, title }
+      const articleIndex: Record<number, { id: string; title: string }> = {};
+      (articles || []).forEach((a, i) => {
+        articleIndex[i + 1] = { id: a.id, title: a.title };
+      });
+
+      return new Response(JSON.stringify({ success: true, summary, articleIndex }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
