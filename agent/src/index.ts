@@ -12,10 +12,14 @@ import {
   createSyncRun,
   completeSyncRun,
   updateSourceSyncStatus,
+  upsertDailyBriefing,
+  fetchRecentClusters,
   type SourceRow,
+  type BriefingSection,
 } from './supabase-client.js';
 import { discoverArticleUrls } from './discover.js';
 import { extractArticle } from './extract.js';
+import { scrapeBriefing } from './briefing.js';
 import { closeBrowser } from './browser.js';
 
 async function syncSource(source: SourceRow, globalLimit?: number) {
