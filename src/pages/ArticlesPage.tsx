@@ -91,6 +91,9 @@ export default function ArticlesPage() {
             <motion.div key={article.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
               <Link to={`/articles/${article.id}`}>
                 <div className="flex items-center gap-4 bg-card border border-border rounded-xl px-5 py-4 hover:border-primary/30 transition-colors group">
+                  {article.source_name.toLowerCase().includes('economist') && (
+                    <img src={economistLogo} alt="The Economist" className="w-8 h-8 rounded shrink-0" />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <SourceBadge name={article.source_name} />
