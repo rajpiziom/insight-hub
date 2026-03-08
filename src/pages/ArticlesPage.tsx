@@ -62,7 +62,12 @@ export default function ArticlesPage() {
   const allTopics = [...new Set(articles.flatMap(a => a.topic_tags || []))];
 
   const filtered = articles.filter(a => {
-    if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const haystack = [a.title, a.subtitle, a.body_text, a.author, a.section, ...(a.topic_tags || [])]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
     if (sourceFilter !== 'all' && a.source_name !== sourceFilter) return false;
     if (topicFilter !== 'all' && !(a.topic_tags || []).includes(topicFilter)) return false;
     return true;
