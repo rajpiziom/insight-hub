@@ -138,9 +138,9 @@ export default function TopicDetailPage() {
     enabled: !!id,
   });
 
-  // Fetch briefing updates for this cluster, ordered chronologically (newest first)
-  const { data: briefingUpdates = [] } = useQuery({
-    queryKey: ['cluster-updates', id],
+  // Fetch briefing updates: both those linked by cluster_id AND all unlinked ones for client-side matching
+  const { data: directUpdates = [] } = useQuery({
+    queryKey: ['cluster-updates-direct', id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('briefing_updates')
@@ -152,6 +152,95 @@ export default function TopicDetailPage() {
     },
     enabled: !!id,
   });
+
+  const { data: allUpdates = [] } = useQuery({
+    queryKey: ['all-briefing-updates'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('briefing_updates')
+        .select('*')
+        .order('published_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!id && !!cluster,
+  });
+
+  // Also pull items from daily_briefings content JSON
+  const { data: dailyBriefings = [] } = useQuery({
+    queryKey: ['daily-briefings-for-cluster'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('daily_briefings')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(7);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!id && !!cluster,
+  });
+
+  // Client-side matching: find briefing items that relate to this cluster
+  const briefingUpdates = useMemo(() => {
+    if (!cluster) return directUpdates;
+
+    const directIds = new Set(directUpdates.map((u: any) => u.id));
+    const keywords = ((cluster.top_keywords || []) as string[]).map(k => k.toLowerCase());
+    const entities = ((cluster.top_entities || []) as string[]).map(e => e.toLowerCase());
+    const clusterTitle = ((cluster.short_title || cluster.title) as string).toLowerCase();
+    const titleParts = clusterTitle.split(/[:\-–—,]/).map(p => p.trim()).filter(p => p.length > 5);
+    const titleWords = clusterTitle.split(/\s+/).filter(w => w.length > 3);
+
+    const matchesCluster = (text: string): boolean => {
+      const lower = text.toLowerCase();
+      let score = 0;
+      for (const kw of keywords) { if (lower.includes(kw)) score += 1; }
+      for (const ent of entities) { if (lower.includes(ent)) score += 1.5; }
+      for (const tw of titleWords) { if (lower.includes(tw)) score += 0.5; }
+      for (const part of titleParts) { if (lower.includes(part)) score += 3; }
+      return score >= 1.5;
+    };
+
+    // Check unlinked briefing_updates
+    const matched = allUpdates.filter((u: any) => {
+      if (directIds.has(u.id)) return false;
+      if (u.cluster_id && u.cluster_id !== id) return false;
+      const text = (u.title || '') + ' ' + (u.summary || '');
+      return matchesCluster(text);
+    });
+
+    // Check daily_briefings JSON content
+    const fromDaily: any[] = [];
+    const seenHashes = new Set([...directUpdates, ...matched].map((u: any) => u.content_hash));
+    for (const b of dailyBriefings) {
+      const content = b.content as any;
+      const sections = content?.sections || [];
+      for (const section of sections) {
+        for (const item of (section.items || [])) {
+          const text = (item.title || '') + ' ' + (item.summary || '');
+          const hash = item.content_hash;
+          if (hash && seenHashes.has(hash)) continue;
+          if (matchesCluster(text)) {
+            seenHashes.add(hash);
+            fromDaily.push({
+              id: hash || `daily-${Math.random()}`,
+              title: item.title,
+              summary: item.summary,
+              source_name: item.sources?.[0] || 'The Economist',
+              published_at: b.generated_at,
+              cluster_id: id,
+            });
+          }
+        }
+      }
+    }
+
+    // Combine and deduplicate, sort by date
+    const all = [...directUpdates, ...matched, ...fromDaily];
+    all.sort((a: any, b: any) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime());
+    return all;
+  }, [directUpdates, allUpdates, dailyBriefings, cluster, id]);
 
   if (clusterLoading || articlesLoading) {
     return (
