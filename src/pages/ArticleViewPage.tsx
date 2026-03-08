@@ -82,8 +82,11 @@ export default function ArticleViewPage() {
   const scrolledDown = useRef(false);
 
   useEffect(() => {
+    // The scrollable container is the <main> element in AppLayout
+    const scrollContainer = document.querySelector('main');
+    if (!scrollContainer) return;
     const handleScroll = () => {
-      const currentY = window.scrollY;
+      const currentY = scrollContainer.scrollTop;
       if (currentY > 200) scrolledDown.current = true;
       if (scrolledDown.current && currentY < lastScrollY.current - 10) {
         setShowBackBar(true);
@@ -97,8 +100,8 @@ export default function ArticleViewPage() {
       }
       lastScrollY.current = currentY;
     };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
   }, []);
   const [showSummary, setShowSummary] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
