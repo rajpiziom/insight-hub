@@ -50,6 +50,7 @@ export const extractScript = `(() => {
     ).forEach(el => el.remove());
   }
 
+  // Try paragraph-based selectors first
   const bodySelectors = [
     'article [data-component="body"] p',
     'article .article__body p',
@@ -61,8 +62,10 @@ export const extractScript = `(() => {
   ];
 
   let bodyText = '';
+  const debug = {};
   for (const sel of bodySelectors) {
     const ps = document.querySelectorAll(sel);
+    debug[sel] = ps.length;
     if (ps.length >= 2) {
       const text = Array.from(ps)
         .map(p => (p.textContent || '').trim())
@@ -74,5 +77,36 @@ export const extractScript = `(() => {
     }
   }
 
-  return { title, subtitle, author, publishedAt, heroImage, bodyText };
+  // Fallback: get innerText from the article body container directly
+  if (bodyText.length < 1500) {
+    const containerSelectors = [
+      '[data-component="body"]',
+      '.article__body',
+      '[data-body-id]',
+      '.layout-article-body',
+      '.article__body-text',
+      '[data-test-id="article-body"]',
+    ];
+    for (const sel of containerSelectors) {
+      const container = document.querySelector(sel);
+      if (container) {
+        const text = container.innerText.trim();
+        debug['fallback_' + sel] = text.length;
+        if (text.length > bodyText.length) {
+          bodyText = text;
+        }
+      }
+    }
+  }
+
+  // Last resort: entire article innerText minus title area
+  if (bodyText.length < 1500 && article) {
+    const fullText = article.innerText.trim();
+    debug['fallback_article_innerText'] = fullText.length;
+    if (fullText.length > bodyText.length) {
+      bodyText = fullText;
+    }
+  }
+
+  return { title, subtitle, author, publishedAt, heroImage, bodyText, debug };
 })()`;
