@@ -75,6 +75,31 @@ export default function ArticleViewPage() {
       navigate('/articles');
     }
   };
+
+  // Show floating back bar when scrolling up
+  const [showBackBar, setShowBackBar] = useState(false);
+  const lastScrollY = useRef(0);
+  const scrolledDown = useRef(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      if (currentY > 200) scrolledDown.current = true;
+      if (scrolledDown.current && currentY < lastScrollY.current - 10) {
+        setShowBackBar(true);
+      }
+      if (currentY > lastScrollY.current + 10) {
+        setShowBackBar(false);
+      }
+      if (currentY < 50) {
+        setShowBackBar(false);
+        scrolledDown.current = false;
+      }
+      lastScrollY.current = currentY;
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   const [showSummary, setShowSummary] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; key_takeaways?: string[]; why_it_matters?: string; implications?: string } | null>(null);
