@@ -14,6 +14,7 @@ import {
   updateSourceSyncStatus,
   upsertDailyBriefing,
   fetchRecentClusters,
+  upsertBriefingUpdate,
   type SourceRow,
   type BriefingSection,
 } from './supabase-client.js';
