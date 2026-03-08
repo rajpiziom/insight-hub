@@ -244,6 +244,87 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, tagged, total: untagged.length }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    } else if (action === "auto-cluster" && userId) {
+      // Get all recent articles for this user
+      const { data: articles } = await supabase
+        .from("articles")
+        .select("id, title, source_name, topic_tags, body_text, published_at")
+        .eq("user_id", userId)
+        .order("published_at", { ascending: false })
+        .limit(100);
+
+      if (!articles || articles.length < 2) {
+        return new Response(JSON.stringify({ success: true, clusters_created: 0, message: "Not enough articles to cluster" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get existing clusters to avoid duplicates
+      const { data: existingClusters } = await supabase
+        .from("event_clusters")
+        .select("id, title, short_title")
+        .eq("user_id", userId);
+
+      const existingTitles = (existingClusters || []).map(c => c.title).join(", ");
+
+      systemPrompt = `You are a news intelligence analyst. Group these articles into event clusters — each cluster represents a specific ongoing story or event. Articles covering the same event from different angles belong together. Return JSON: { clusters: [{ title (concise event name), short_title (2-4 words), overview (2-3 sentences), why_it_matters (1 sentence), top_entities (array of key people/orgs/places), top_keywords (array), article_ids (array of article IDs that belong) }] }. Only create clusters with 2+ articles. Make 3-8 clusters max.${existingTitles ? `\n\nExisting clusters to avoid duplicating: ${existingTitles}` : ""}`;
+
+      prompt = articles.map(a =>
+        `[ID: ${a.id}] "${a.title}" (${a.source_name}, tags: ${(a.topic_tags || []).join(", ")})\n${(a.body_text || "").substring(0, 500)}`
+      ).join("\n\n---\n\n");
+
+      const response = await callAI(LOVABLE_API_KEY, systemPrompt, prompt, true);
+
+      let clusters: any[] = [];
+      try {
+        const parsed = JSON.parse(response);
+        const inner = parsed.result ? JSON.parse(parsed.result) : parsed;
+        clusters = inner.clusters || (Array.isArray(inner) ? inner : []);
+      } catch {}
+
+      let created = 0;
+      for (const c of clusters) {
+        if (!c.title || !c.article_ids || c.article_ids.length < 2) continue;
+
+        // Check for duplicate
+        const isDupe = (existingClusters || []).some(ec => 
+          ec.title.toLowerCase() === c.title.toLowerCase() || 
+          (ec.short_title && ec.short_title.toLowerCase() === (c.short_title || "").toLowerCase())
+        );
+        if (isDupe) continue;
+
+        const { data: cluster, error: clusterErr } = await supabase
+          .from("event_clusters")
+          .insert({
+            user_id: userId,
+            title: c.title,
+            short_title: c.short_title || c.title.substring(0, 30),
+            overview: c.overview || "",
+            why_it_matters: c.why_it_matters || null,
+            top_entities: c.top_entities || [],
+            top_keywords: c.top_keywords || [],
+            article_count: c.article_ids.length,
+            source_count: new Set(articles.filter(a => c.article_ids.includes(a.id)).map(a => a.source_name)).size,
+            status: "active",
+          })
+          .select("id")
+          .single();
+
+        if (clusterErr || !cluster) continue;
+
+        // Link articles to cluster
+        const links = c.article_ids.map((aid: string) => ({
+          cluster_id: cluster.id,
+          article_id: aid,
+          relevance_score: 0.9,
+        }));
+        await supabase.from("event_cluster_articles").insert(links);
+        created++;
+      }
+
+      return new Response(JSON.stringify({ success: true, clusters_created: created }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), {
