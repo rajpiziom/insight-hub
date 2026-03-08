@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import economistLogo from '@/assets/economist-logo.png';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 
 function formatTime(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
