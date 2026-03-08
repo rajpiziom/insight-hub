@@ -120,8 +120,31 @@ export default function BriefingPage() {
     }
   };
 
+  const [clusterMap, setClusterMap] = useState<Record<string, string>>({}); // title snippet -> cluster_id
+
+  const loadBriefingUpdates = async () => {
+    try {
+      const { data } = await supabase
+        .from('briefing_updates')
+        .select('title, summary, cluster_id')
+        .not('cluster_id', 'is', null);
+      if (data) {
+        const map: Record<string, string> = {};
+        for (const u of data) {
+          if (u.cluster_id) {
+            // Index by first 60 chars of summary for matching
+            map[u.summary.slice(0, 60).toLowerCase()] = u.cluster_id;
+            map[u.title.toLowerCase()] = u.cluster_id;
+          }
+        }
+        setClusterMap(map);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     loadBriefing();
+    loadBriefingUpdates();
   }, []);
 
   const handleRegenerate = async () => {
