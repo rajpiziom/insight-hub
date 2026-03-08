@@ -164,11 +164,25 @@ export default function ArticleViewPage() {
   }
 
   if (!article) {
-    return (
-      <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-        <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+  return (
+    <>
+      {/* Floating back bar on scroll up */}
+      <motion.div
+        initial={{ y: -60 }}
+        animate={{ y: showBackBar ? 0 : -60 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-b border-border shadow-sm px-4 py-2.5 flex items-center gap-3"
+      >
+        <button onClick={goBack} className="inline-flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
+        <span className="text-xs text-muted-foreground truncate">{article?.title}</span>
+      </motion.div>
+
+    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+      <button onClick={goBack} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
+        <ArrowLeft className="w-4 h-4" /> Back
+      </button>
         <p className="text-muted-foreground">Article not found.</p>
       </div>
     );
