@@ -16,11 +16,12 @@ function formatTime(dateStr: string) {
 }
 
 // CitedText renders inline citation markers as links to the specific passage in the article
-function CitedText({ text, articleIndex, citationQuotes, citationOffset }: { 
+function CitedText({ text, articleIndex, citationQuotes, citationOffset, fromPath }: { 
   text: string; 
   articleIndex: Record<number, { id: string; title: string }>; 
   citationQuotes: { num: number; quote: string }[];
   citationOffset: number;
+  fromPath: string;
 }) {
   const parts = text.split(/(\[\d+\])/g);
   let localIdx = 0;
@@ -36,7 +37,7 @@ function CitedText({ text, articleIndex, citationQuotes, citationOffset }: {
           if (article) {
             const highlightParam = quoteEntry?.quote ? `?highlight=${encodeURIComponent(quoteEntry.quote)}` : '';
             return (
-              <Link key={i} to={`/articles/${article.id}${highlightParam}`} className="inline-flex items-center no-underline" title={quoteEntry?.quote || article.title}>
+              <Link key={i} to={`/articles/${article.id}${highlightParam}`} state={{ from: fromPath }} className="inline-flex items-center no-underline" title={quoteEntry?.quote || article.title}>
                 <span className="text-[10px] font-medium text-primary bg-primary/10 rounded px-1 py-0.5 hover:bg-primary/20 transition-colors cursor-pointer">{num}</span>
               </Link>
             );
