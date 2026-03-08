@@ -7,6 +7,8 @@ import {
   insertDiscoveredUrl,
   insertArticle,
   fetchUningestedUrls,
+  fetchShortArticles,
+  updateArticleBody,
   createSyncRun,
   completeSyncRun,
   updateSourceSyncStatus,
