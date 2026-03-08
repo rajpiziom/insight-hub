@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Newspaper, Layers, BookOpen, Rss, Bookmark,
-  MessageSquare, Settings, ChevronLeft, ChevronRight, Zap, Search, Activity,
+  MessageSquare, Settings, ChevronLeft, ChevronRight, Zap, Search, Hash,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/briefing', icon: Zap, label: 'Briefing' },
   { to: '/topics', icon: Layers, label: 'Events' },
+  { to: '/tag', icon: Hash, label: 'Topics' },
   { to: '/articles', icon: BookOpen, label: 'Articles' },
   { to: '/sources', icon: Rss, label: 'Sources' },
   { to: '/bookmarks', icon: Bookmark, label: 'Bookmarks' },

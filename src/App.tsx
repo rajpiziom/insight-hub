@@ -9,6 +9,8 @@ import ArticlesPage from "./pages/ArticlesPage";
 import ArticleViewPage from "./pages/ArticleViewPage";
 import TopicsPage from "./pages/TopicsPage";
 import TopicDetailPage from "./pages/TopicDetailPage";
+import TagTopicsPage from "./pages/TagTopicsPage";
+import TagTopicDetailPage from "./pages/TagTopicDetailPage";
 import BriefingPage from "./pages/BriefingPage";
 import SourcesPage from "./pages/SourcesPage";
 import SourceDetailPage from "./pages/SourceDetailPage";
@@ -60,6 +62,8 @@ function AppWithAuth() {
       <Route path="/articles/:id" element={<AppLayout><ArticleViewPage /></AppLayout>} />
       <Route path="/topics" element={<AppLayout><TopicsPage /></AppLayout>} />
       <Route path="/topics/:id" element={<AppLayout><TopicDetailPage /></AppLayout>} />
+      <Route path="/tag" element={<AppLayout><TagTopicsPage /></AppLayout>} />
+      <Route path="/tag/:tag" element={<AppLayout><TagTopicDetailPage /></AppLayout>} />
       <Route path="/briefing" element={<AppLayout><BriefingPage /></AppLayout>} />
       <Route path="/sources" element={<AppLayout><SourcesPage /></AppLayout>} />
       <Route path="/sources/:id" element={<AppLayout><SourceDetailPage /></AppLayout>} />
