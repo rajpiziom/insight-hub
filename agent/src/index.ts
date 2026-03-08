@@ -167,8 +167,10 @@ program
 program
   .command('sync')
   .description('Run one sync cycle for all enabled sources')
-  .action(async () => {
-    await runOnce();
+  .option('-l, --limit <n>', 'Max total articles to extract per source')
+  .action(async (opts) => {
+    const limit = opts.limit ? parseInt(opts.limit) : undefined;
+    await runOnce(limit);
   });
 
 program
