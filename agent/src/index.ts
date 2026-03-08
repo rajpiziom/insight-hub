@@ -6,6 +6,7 @@ import {
   isUrlKnown,
   insertDiscoveredUrl,
   insertArticle,
+  fetchUningestedUrls,
   createSyncRun,
   completeSyncRun,
   updateSourceSyncStatus,
