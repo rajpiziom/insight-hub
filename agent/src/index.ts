@@ -226,18 +226,67 @@ program
       console.log('\\n📄 First 500 chars of page text:');
       console.log(pageText);
 
-      // Check for paywall indicators
-      const hasPaywall = await page.evaluate(`(() => {
+      // Dump DOM structure to find correct selectors
+      const domInfo = await page.evaluate(`(() => {
+        const article = document.querySelector('article');
+        if (!article) return { error: 'No <article> element found' };
+
+        // Get all unique tag+class combos inside article
+        const elements = new Set();
+        article.querySelectorAll('*').forEach(el => {
+          const tag = el.tagName.toLowerCase();
+          const cls = el.className && typeof el.className === 'string' ? '.' + el.className.split(' ').filter(c=>c).join('.') : '';
+          const dataAttrs = Array.from(el.attributes)
+            .filter(a => a.name.startsWith('data-'))
+            .map(a => '[' + a.name + '="' + a.value + '"]')
+            .join('');
+          elements.add(tag + cls + dataAttrs);
+        });
+
+        // Find all paragraph containers
+        const pContainers = [];
+        article.querySelectorAll('p').forEach(p => {
+          const parent = p.parentElement;
+          if (parent) {
+            const tag = parent.tagName.toLowerCase();
+            const cls = parent.className && typeof parent.className === 'string' ? '.' + parent.className.split(' ').filter(c=>c).join('.') : '';
+            const key = tag + cls;
+            if (!pContainers.includes(key)) pContainers.push(key);
+          }
+        });
+
+        // Get article's direct children structure
+        const children = Array.from(article.children).map(c => {
+          const tag = c.tagName.toLowerCase();
+          const cls = c.className && typeof c.className === 'string' ? '.' + c.className.split(' ').filter(c2=>c2).join('.') : '';
+          const text = (c.innerText || '').substring(0, 100);
+          return { sel: tag + cls, textPreview: text, childCount: c.children.length };
+        });
+
+        // Total article text
+        const totalText = article.innerText.length;
+
+        // Check for paywall
         const text = document.body.innerText.toLowerCase();
+
         return {
+          totalArticleTextLength: totalText,
+          articleDirectChildren: children,
+          pParentSelectors: pContainers,
           hasLoginPrompt: text.includes('log in') || text.includes('sign in'),
-          hasSubscribe: text.includes('subscribe') || text.includes('subscription'),
-          hasFreeTrialText: text.includes('free trial') || text.includes('already have an account'),
-          articleParagraphs: document.querySelectorAll('article p').length,
-          totalTextLength: document.querySelector('article') ? document.querySelector('article').innerText.length : 0
+          hasSubscribe: text.includes('subscribe'),
+          uniqueElementCount: elements.size,
         };
       })()`);
-      console.log('\\n🔍 Paywall indicators:', JSON.stringify(hasPaywall, null, 2));
+      console.log('\\n🔍 DOM structure:', JSON.stringify(domInfo, null, 2));
+
+      // Also save full article HTML for inspection
+      const articleHtml = await page.evaluate(`(() => {
+        const article = document.querySelector('article');
+        return article ? article.innerHTML.substring(0, 10000) : 'No article element';
+      })()`);
+      fs.writeFileSync('debug-article.html', articleHtml);
+      console.log('\\n💾 Article HTML saved to debug-article.html (first 10KB)');
 
       await page.close();
     } finally {
