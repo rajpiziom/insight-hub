@@ -83,6 +83,20 @@ export async function insertDiscoveredUrl(sourceId: string, url: string, title: 
   if (error) console.error(`  ✗ Failed to insert discovered URL: ${error.message}`);
 }
 
+export async function fetchUningestedUrls(sourceId: string, limit: number) {
+  const { supabase, userId } = await getSupabase();
+  const { data, error } = await supabase
+    .from('discovered_urls')
+    .select('url, title')
+    .eq('source_id', sourceId)
+    .eq('user_id', userId)
+    .eq('ingested', false)
+    .limit(limit);
+  if (error) throw new Error(`Failed to fetch uningested URLs: ${error.message}`);
+  return data || [];
+}
+}
+
 export async function insertArticle(sourceId: string, article: {
   canonical_url: string;
   title: string;
