@@ -120,7 +120,7 @@ export default function ArticlesPage() {
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <SourceBadge name={article.source_name} />
+                      <span className="text-xs text-muted-foreground">{formatTime(article.published_at || article.imported_at)}</span>
                       <span className="text-xs text-muted-foreground">{formatTime(article.published_at || article.imported_at)}</span>
                       <SentimentIndicator sentiment={article.sentiment} showLabel={false} />
                       {article.is_bookmarked && <Bookmark className="w-3 h-3 text-primary fill-primary" />}
