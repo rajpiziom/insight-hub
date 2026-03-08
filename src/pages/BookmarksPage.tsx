@@ -12,13 +12,8 @@ export default function BookmarksPage() {
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto">
       <PageHeader title="Bookmarks" description="Your saved articles" />
-
       {bookmarked.length === 0 ? (
-        <EmptyState
-          icon={BookmarkIcon}
-          title="No bookmarks yet"
-          description="Save articles from any page to access them here."
-        />
+        <EmptyState icon={BookmarkIcon} title="No bookmarks yet" description="Save articles from any page to access them here." />
       ) : (
         <div className="space-y-2">
           {bookmarked.map((article, i) => (
@@ -30,7 +25,7 @@ export default function BookmarksPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <SourceBadge name={article.source_name} />
                       <span className="text-xs text-muted-foreground">
-                        {new Date(article.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {new Date(article.published_at || '').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
                     <h3 className="font-medium text-sm group-hover:text-primary transition-colors truncate">{article.title}</h3>
