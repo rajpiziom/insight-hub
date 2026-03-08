@@ -28,7 +28,7 @@ export async function extractArticle(url: string): Promise<ExtractedArticle | nu
 
     // Scroll through the page to trigger lazy loading
     await page.evaluate(async () => {
-      const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+      const delay = (ms) => new Promise(r => setTimeout(r, ms));
       const h = document.body.scrollHeight;
       for (let y = 0; y < h; y += 500) {
         window.scrollTo(0, y);
