@@ -4,6 +4,7 @@ import { Bookmark as BookmarkIcon, ArrowRight, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import economistLogo from '@/assets/economist-logo.png';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -42,7 +43,11 @@ export default function BookmarksPage() {
             <motion.div key={article.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
               <Link to={`/articles/${article.id}`}>
                 <div className="flex items-center gap-4 bg-card border border-border rounded-xl px-5 py-4 hover:border-primary/30 transition-colors group">
-                  <BookmarkIcon className="w-4 h-4 text-primary fill-primary shrink-0" />
+                  {article.source_name?.toLowerCase().includes('economist') ? (
+                    <img src={economistLogo} alt="The Economist" className="w-8 h-8 rounded shrink-0" />
+                  ) : (
+                    <BookmarkIcon className="w-4 h-4 text-primary fill-primary shrink-0" />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <SourceBadge name={article.source_name} />

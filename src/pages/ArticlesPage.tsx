@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, ArrowRight, Bookmark, Loader2 } from 'lucide-react';
+import economistLogo from '@/assets/economist-logo.png';
 import { PageHeader } from '@/components/ui/page-header';
 import { SourceBadge } from '@/components/ui/source-badge';
 import { SentimentIndicator } from '@/components/ui/sentiment-indicator';
@@ -90,6 +91,9 @@ export default function ArticlesPage() {
             <motion.div key={article.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
               <Link to={`/articles/${article.id}`}>
                 <div className="flex items-center gap-4 bg-card border border-border rounded-xl px-5 py-4 hover:border-primary/30 transition-colors group">
+                  {article.source_name.toLowerCase().includes('economist') && (
+                    <img src={economistLogo} alt="The Economist" className="w-8 h-8 rounded shrink-0" />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <SourceBadge name={article.source_name} />
