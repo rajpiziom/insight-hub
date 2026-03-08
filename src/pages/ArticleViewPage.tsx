@@ -65,7 +65,7 @@ export default function ArticleViewPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const highlightQuery = searchParams.get('highlight');
-  const navigate = useNavigate();
+  const goBack = () => window.history.back();
   const [showSummary, setShowSummary] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<{ summary: string; key_takeaways?: string[]; why_it_matters?: string; implications?: string } | null>(null);
