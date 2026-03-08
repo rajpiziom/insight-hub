@@ -77,7 +77,7 @@ async function syncSource(source: SourceRow, globalLimit?: number) {
 
     // Also pick up previously discovered but un-ingested URLs
     if (toExtract.length === 0) {
-      const uningested = await fetchUningestedUrls(source.id, allEndpoints.length * MAX_PER_SECTION);
+      const uningested = await fetchUningestedUrls(source.id, maxTotal);
       if (uningested.length > 0) {
         console.log(`\n🔄 Retrying ${uningested.length} previously discovered but un-ingested URLs...`);
         toExtract = uningested.map(u => ({ url: u.url, title: u.title }));
