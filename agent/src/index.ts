@@ -18,7 +18,7 @@ import { discoverArticleUrls } from './discover.js';
 import { extractArticle } from './extract.js';
 import { closeBrowser } from './browser.js';
 
-async function syncSource(source: SourceRow) {
+async function syncSource(source: SourceRow, globalLimit?: number) {
   console.log(`\n═══════════════════════════════════════`);
   console.log(`📰 Syncing: ${source.source_name} (${source.source_domain})`);
   console.log(`═══════════════════════════════════════`);
