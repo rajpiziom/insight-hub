@@ -336,7 +336,7 @@ serve(async (req) => {
       const articleIds = clusterArticles.map(ca => ca.article_id);
       const { data: articles } = await supabase
         .from("articles")
-        .select("title, source_name, author, published_at, body_text, topic_tags")
+        .select("id, title, source_name, author, published_at, body_text, topic_tags")
         .in("id", articleIds)
         .order("published_at", { ascending: true });
 
@@ -350,11 +350,12 @@ serve(async (req) => {
         .single();
 
       const clusterMode = mode || "explain";
+      const citationInstruction = `\n\nCRITICAL: After every factual claim, cite the source article using its number in square brackets, e.g. [1], [2]. Every bullet or sentence with a fact MUST have at least one citation. Multiple citations like [1][3] are fine.`;
 
       if (clusterMode === "updates") {
-        systemPrompt = `You are a concise news wire editor. The reader ALREADY knows the background — do NOT explain what the event is. Give ONLY the latest developments as short, punchy bullet points (max 8 bullets total). Each bullet: one sentence, specific (names, dates, figures). End with 2-3 "What to watch" bullets on near-term outlook. Use markdown bullets (- ). No headings, no paragraphs, no preamble.`;
+        systemPrompt = `You are a concise news wire editor. The reader ALREADY knows the background — do NOT explain what the event is. Give ONLY the latest developments as short, punchy bullet points (max 8 bullets total). Each bullet: one sentence, specific (names, dates, figures). End with 2-3 "What to watch" bullets on near-term outlook. Use markdown bullets (- ). No headings, no paragraphs, no preamble.` + citationInstruction;
       } else {
-        systemPrompt = `You are a senior intelligence briefing analyst. The reader is new to this story. Write a comprehensive explainer that covers: what is happening, why it matters, who the key players are, how we got here, and what the implications are. Write in clear, authoritative prose — not bullet points. The summary should be 3-5 paragraphs.`;
+        systemPrompt = `You are a senior intelligence briefing analyst. The reader is new to this story. Write a comprehensive explainer that covers: what is happening, why it matters, who the key players are, how we got here, and what the implications are. Write in clear, authoritative prose — not bullet points. The summary should be 3-5 paragraphs.` + citationInstruction;
       }
 
       prompt = `Event: ${cluster?.title || "Unknown"}\n\nArticles (${articles.length} total, ordered chronologically):\n\n${articles.map((a, i) =>
@@ -384,7 +385,13 @@ serve(async (req) => {
       const data = await response.json();
       const summary = data.choices?.[0]?.message?.content || "";
 
-      return new Response(JSON.stringify({ success: true, summary }), {
+      // Build article index mapping: number -> { id, title }
+      const articleIndex: Record<number, { id: string; title: string }> = {};
+      (articles || []).forEach((a, i) => {
+        articleIndex[i + 1] = { id: a.id, title: a.title };
+      });
+
+      return new Response(JSON.stringify({ success: true, summary, articleIndex }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
