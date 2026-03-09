@@ -74,11 +74,18 @@ function BriefingTile({ item, index }: { item: DisplayItem; index: number }) {
               )}
               <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
                 <SourceBadge name={item.source_name} />
-                {item.cluster_id && (
-                  <Link to={`/topics/${item.cluster_id}`} onClick={(e) => e.stopPropagation()}>
-                    <Button variant="default" size="sm" className="text-xs gap-1 h-7">View Event →</Button>
-                  </Link>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {item.article_id && (
+                    <Link to={`/articles/${item.article_id}`} onClick={(e) => e.stopPropagation()}>
+                      <Button variant="outline" size="sm" className="text-xs gap-1 h-7">Read Article →</Button>
+                    </Link>
+                  )}
+                  {item.cluster_id && (
+                    <Link to={`/topics/${item.cluster_id}`} onClick={(e) => e.stopPropagation()}>
+                      <Button variant="default" size="sm" className="text-xs gap-1 h-7">View Event →</Button>
+                    </Link>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}
