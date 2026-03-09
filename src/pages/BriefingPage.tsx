@@ -139,6 +139,7 @@ export default function BriefingPage() {
               theme: section.theme || 'Other',
               source_name: (item.sources?.[0]) || 'The Economist',
               why_it_matters: item.why_it_matters,
+              article_id: item.article_id,
               cluster_id: undefined,
               published_at: daily.generated_at,
               from_source: 'daily_briefings',
