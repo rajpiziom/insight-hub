@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface BriefingItem {
+interface DisplayItem {
   id: string;
   title: string;
   summary: string;
@@ -19,6 +19,7 @@ interface BriefingItem {
   why_it_matters?: string;
   cluster_id?: string;
   published_at: string;
+  from_source: 'briefing_updates' | 'daily_briefings';
 }
 
 function shortenTitle(title: string, max = 45): string {
@@ -28,7 +29,7 @@ function shortenTitle(title: string, max = 45): string {
   return (lastSpace > max * 0.4 ? trimmed.slice(0, lastSpace) : trimmed) + '…';
 }
 
-function BriefingTile({ item, index }: { item: BriefingItem; index: number }) {
+function BriefingTile({ item, index }: { item: DisplayItem; index: number }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -88,30 +89,59 @@ function BriefingTile({ item, index }: { item: BriefingItem; index: number }) {
 }
 
 export default function BriefingPage() {
-  const [items, setItems] = useState<BriefingItem[]>([]);
+  const [items, setItems] = useState<DisplayItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [enriching, setEnriching] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   const loadBriefing = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // First try briefing_updates (World in Brief scrape via agent)
+      const { data: updates } = await supabase
         .from('briefing_updates')
         .select('*')
         .order('published_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
-      if (data) {
-        setItems(data);
-        if (data.length > 0) {
-          setLastUpdate(new Date(data[0].published_at));
+      if (updates && updates.length > 0) {
+        setItems(updates.map(u => ({ ...u, from_source: 'briefing_updates' as const })));
+        setLastUpdate(new Date(updates[0].published_at));
+        setLoading(false);
+        return;
+      }
+
+      // Fall back to latest daily_briefings (AI-generated from articles)
+      const { data: daily } = await supabase
+        .from('daily_briefings')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (daily && daily.content) {
+        const content = daily.content as any;
+        const flatItems: DisplayItem[] = [];
+        for (const section of (content.sections || [])) {
+          for (const item of (section.items || [])) {
+            flatItems.push({
+              id: `${daily.id}-${flatItems.length}`,
+              title: item.title,
+              summary: item.summary,
+              theme: section.theme || 'Other',
+              source_name: (item.sources?.[0]) || 'The Economist',
+              why_it_matters: item.why_it_matters,
+              cluster_id: undefined,
+              published_at: daily.generated_at,
+              from_source: 'daily_briefings',
+            });
+          }
         }
+        setItems(flatItems);
+        if (flatItems.length > 0) setLastUpdate(new Date(daily.generated_at));
       }
     } catch (err) {
       console.error('Failed to load briefing:', err);
-      toast.error('Failed to load briefing items');
     } finally {
       setLoading(false);
     }
@@ -121,21 +151,24 @@ export default function BriefingPage() {
     loadBriefing();
   }, []);
 
-  const handleEnrich = async () => {
-    setEnriching(true);
+  const handleRegenerate = async () => {
+    setGenerating(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
       const { error } = await supabase.functions.invoke('ai-analyze', {
-        body: { action: 'enrich-briefing' }
+        body: { action: 'briefing', userId: user.id }
       });
 
       if (error) throw error;
-      
-      toast.success('Briefing items enriched');
+
+      toast.success('Briefing regenerated');
       await loadBriefing();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to enrich briefing');
+      toast.error(err.message || 'Failed to regenerate briefing');
     } finally {
-      setEnriching(false);
+      setGenerating(false);
     }
   };
 
@@ -145,7 +178,7 @@ export default function BriefingPage() {
     if (!acc[theme]) acc[theme] = [];
     acc[theme].push(item);
     return acc;
-  }, {} as Record<string, BriefingItem[]>);
+  }, {} as Record<string, DisplayItem[]>);
 
   const themes = Object.keys(groupedByTheme).sort();
   const isRecent = lastUpdate ? (Date.now() - lastUpdate.getTime()) < 24 * 60 * 60 * 1000 : false;
@@ -156,12 +189,10 @@ export default function BriefingPage() {
         title="Daily Briefing"
         description="Key stories from The Economist's World in Brief"
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleEnrich} disabled={enriching}>
-              <RefreshCw className={cn("w-3.5 h-3.5", enriching && "animate-spin")} /> 
-              {enriching ? 'Enriching...' : 'Enrich with AI'}
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleRegenerate} disabled={generating}>
+            <RefreshCw className={cn("w-3.5 h-3.5", generating && "animate-spin")} />
+            {generating ? 'Generating...' : 'Regenerate'}
+          </Button>
         }
       />
 
@@ -178,10 +209,14 @@ export default function BriefingPage() {
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Inbox className="w-12 h-12 text-muted-foreground/40 mb-4" />
-          <h3 className="font-display font-semibold text-lg mb-2">No briefing items yet</h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Run the local agent with the briefing sync command to pull the latest from The Economist's World in Brief.
+          <h3 className="font-display font-semibold text-lg mb-2">No briefing yet</h3>
+          <p className="text-sm text-muted-foreground max-w-md mb-4">
+            Click Regenerate to generate a briefing from your recent articles, or run the local agent to pull The Economist's World in Brief.
           </p>
+          <Button onClick={handleRegenerate} disabled={generating} size="sm" className="gap-1.5">
+            <RefreshCw className={cn("w-3.5 h-3.5", generating && "animate-spin")} />
+            {generating ? 'Generating...' : 'Regenerate Now'}
+          </Button>
         </div>
       ) : (
         <>
