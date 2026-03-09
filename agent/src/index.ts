@@ -20,7 +20,7 @@ import {
 } from './supabase-client.js';
 import { discoverArticleUrls } from './discover.js';
 import { extractArticle } from './extract.js';
-import { scrapeBriefing } from './briefing.js';
+import { syncBriefing } from './briefing.js';
 import { closeBrowser } from './browser.js';
 
 async function syncSource(source: SourceRow, globalLimit?: number) {
