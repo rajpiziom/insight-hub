@@ -542,6 +542,7 @@ If no event matches, omit cluster_id.`;
       const classifySystemPrompt = `You are a news intelligence classifier. For each item, determine:
 1. The best THEME from this list: ${themes.join(', ')}
 2. The best matching EVENT CLUSTER (if any) from the existing clusters below. Only match if the item is clearly about that specific event/story. If no cluster matches, use null.
+3. The CONTENT TYPE: "briefing" for short news updates, market wraps, wire-style bulletins, quick summaries, daily digests, or brief factual items (typically under 300 words). "article" for longer-form analysis, features, opinion pieces, investigative reports, or in-depth coverage.
 
 ${clusterDescriptions ? `EXISTING EVENT CLUSTERS:\n${clusterDescriptions}` : 'No existing clusters.'}`;
 
