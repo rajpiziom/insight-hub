@@ -197,11 +197,23 @@ program
 
 program
   .command('sync')
-  .description('Run one sync cycle for all enabled sources')
+  .description('Run one sync cycle for all enabled sources + briefings')
   .option('-l, --limit <n>', 'Max total articles to extract per source')
   .action(async (opts) => {
     const limit = opts.limit ? parseInt(opts.limit) : undefined;
     await runOnce(limit);
+  });
+
+program
+  .command('briefing')
+  .description('Sync only The Economist briefing (faster for testing)')
+  .action(async () => {
+    validateConfig();
+    try {
+      await syncBriefings();
+    } finally {
+      await closeBrowser();
+    }
   });
 
 program
