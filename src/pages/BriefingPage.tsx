@@ -18,6 +18,7 @@ interface DisplayItem {
   source_name: string;
   why_it_matters?: string;
   cluster_id?: string;
+  article_id?: string;
   published_at: string;
   from_source: 'briefing_updates' | 'daily_briefings';
 }
