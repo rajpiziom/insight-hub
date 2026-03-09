@@ -102,6 +102,102 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
 
+    } else if (action === "enrich-briefing") {
+      // Get auth header and verify user
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Not authenticated" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Decode JWT to get user_id
+      const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: "Invalid token" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const enrichUserId = user.id;
+
+      // Get recent briefing items that haven't been enriched yet
+      const { data: items, error: fetchError } = await supabase
+        .from("briefing_updates")
+        .select("id, title, summary, theme")
+        .eq("user_id", enrichUserId)
+        .is("why_it_matters", null)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (fetchError || !items || items.length === 0) {
+        return new Response(JSON.stringify({ message: "No items to enrich", enriched: 0 }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get active event clusters for matching
+      const { data: clusters } = await supabase
+        .from("event_clusters")
+        .select("id, title, short_title, top_keywords, top_entities")
+        .eq("user_id", enrichUserId)
+        .in("status", ["active", "developing"]);
+
+      const clusterContext = (clusters || []).map(c => ({
+        id: c.id,
+        title: c.short_title || c.title,
+        keywords: c.top_keywords || [],
+        entities: c.top_entities || [],
+      }));
+
+      // Enrich each item with AI
+      let enriched = 0;
+      for (const item of items) {
+        const promptText = `Analyze this news briefing item and provide:
+1. A concise "why it matters" statement (1-2 sentences explaining significance)
+2. If it relates to any of these ongoing events, provide the matching event ID
+
+Briefing item:
+Title: ${item.title}
+Summary: ${item.summary}
+
+Available events:
+${clusterContext.map(c => `- ID: ${c.id}, Title: ${c.title}, Keywords: ${c.keywords.join(', ')}, Entities: ${c.entities.join(', ')}`).join('\n')}
+
+Return JSON: { "why_it_matters": "...", "cluster_id": "..." }
+If no event matches, omit cluster_id.`;
+
+        const aiResponse = await callAI(LOVABLE_API_KEY, "You are a news analyst. Return concise, factual analysis in JSON format.", promptText, true);
+
+        try {
+          const parsed = JSON.parse(aiResponse);
+          const inner = parsed.result ? JSON.parse(parsed.result) : parsed;
+          
+          const updateData: any = {
+            why_it_matters: inner.why_it_matters || null,
+          };
+          
+          if (inner.cluster_id && clusterContext.some(c => c.id === inner.cluster_id)) {
+            updateData.cluster_id = inner.cluster_id;
+          }
+
+          await supabase
+            .from("briefing_updates")
+            .update(updateData)
+            .eq("id", item.id);
+          
+          enriched++;
+        } catch (e) {
+          console.error(`Failed to parse AI response for item ${item.id}:`, e);
+        }
+      }
+
+      return new Response(JSON.stringify({ enriched }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
     } else if (action === "briefing" && userId) {
       // Get recent articles — last 7 days by published_at OR recently imported
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
