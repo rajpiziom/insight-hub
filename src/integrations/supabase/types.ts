@@ -248,8 +248,10 @@ export type Database = {
           published_at: string
           source_name: string
           summary: string
+          theme: string | null
           title: string
           user_id: string
+          why_it_matters: string | null
         }
         Insert: {
           cluster_id?: string | null
@@ -259,8 +261,10 @@ export type Database = {
           published_at?: string
           source_name?: string
           summary: string
+          theme?: string | null
           title: string
           user_id: string
+          why_it_matters?: string | null
         }
         Update: {
           cluster_id?: string | null
@@ -270,8 +274,10 @@ export type Database = {
           published_at?: string
           source_name?: string
           summary?: string
+          theme?: string | null
           title?: string
           user_id?: string
+          why_it_matters?: string | null
         }
         Relationships: [
           {

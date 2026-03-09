@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { newPage } from './browser.js';
+import { createClient } from '@supabase/supabase-js';
 
 export interface BriefingItem {
   title: string;
@@ -76,11 +77,21 @@ function extractTitle(text: string): string {
 }
 
 /**
- * Scrape The Economist's "The World in Brief" page and extract briefing items.
+ * Scrape The Economist's "The World in Brief" page and sync to database.
  */
-export async function scrapeBriefing(url: string = 'https://www.economist.com/the-world-in-brief'): Promise<BriefingItem[]> {
-  console.log(`\n📋 Scraping briefing from: ${url}`);
+export async function syncBriefing(url: string = 'https://www.economist.com/the-world-in-brief'): Promise<void> {
+  console.log(`\n📋 Syncing briefing from: ${url}`);
 
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+  const userId = process.env.USER_ID;
+
+  if (!supabaseUrl || !supabaseKey || !userId) {
+    console.error('  ✗ Missing required environment variables (SUPABASE_URL, SUPABASE_ANON_KEY, USER_ID)');
+    return;
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
   const page = await newPage();
 
   try {
@@ -129,7 +140,7 @@ export async function scrapeBriefing(url: string = 'https://www.economist.com/th
 
     if (!rawItems || rawItems.length === 0) {
       console.warn('  ⚠ No briefing items found. Page may be paywalled.');
-      return [];
+      return;
     }
 
     console.log(`  Found ${rawItems.length} raw items, filtering noise...`);
@@ -146,22 +157,47 @@ export async function scrapeBriefing(url: string = 'https://www.economist.com/th
 
     console.log(`  ${cleanItems.length} items after noise filter (removed ${rawItems.length - cleanItems.length})`);
 
-    const items: BriefingItem[] = cleanItems.map(text => {
+    // Prepare items for database
+    const itemsToInsert = cleanItems.map(text => {
       const contentHash = createHash('sha256').update(text.slice(0, 200)).digest('hex');
       return {
+        user_id: userId,
         title: extractTitle(text),
         summary: text,
         theme: classifyTheme(text),
-        sources: ['The Economist'],
+        source_name: 'The Economist',
         content_hash: contentHash,
+        published_at: new Date().toISOString(),
       };
     });
 
-    return items;
+    // Insert into briefing_updates table (upsert based on content_hash)
+    for (const item of itemsToInsert) {
+      const { error } = await supabase
+        .from('briefing_updates')
+        .upsert(item, { onConflict: 'user_id,content_hash', ignoreDuplicates: false });
+
+      if (error) {
+        console.error(`  ✗ Failed to insert briefing item: ${error.message}`);
+      }
+    }
+
+    console.log(`  ✓ Synced ${itemsToInsert.length} briefing items to database`);
+
+    // Trigger AI enrichment via edge function
+    console.log(`  🤖 Triggering AI enrichment...`);
+    const { error: enrichError } = await supabase.functions.invoke('ai-analyze', {
+      body: { action: 'enrich-briefing' }
+    });
+
+    if (enrichError) {
+      console.error(`  ✗ AI enrichment failed: ${enrichError.message}`);
+    } else {
+      console.log(`  ✓ AI enrichment triggered`);
+    }
 
   } catch (err: any) {
-    console.error(`  ✗ Briefing scrape failed: ${err.message}`);
-    return [];
+    console.error(`  ✗ Briefing sync failed: ${err.message}`);
   } finally {
     await page.close();
   }

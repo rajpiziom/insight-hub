@@ -70,13 +70,21 @@ CHROME_PROFILE_PATH=/path/to/chrome/profile
 
 ## Usage
 
-### One-time sync
+### Sync sources + briefing
 
 ```bash
 npm start sync
 ```
 
-Discovers and imports new articles from all enabled sources.
+Discovers and imports new articles from all enabled sources, plus syncs The Economist's "World in Brief" briefing.
+
+### Sync only briefing (faster)
+
+```bash
+npm start briefing
+```
+
+Syncs only The Economist's "World in Brief" briefing without syncing full articles. Faster for getting daily updates.
 
 ### Run as daemon
 
