@@ -11,61 +11,21 @@ export interface BriefingItem {
   content_hash: string;
 }
 
-const THEME_KEYWORDS: Record<string, string[]> = {
-  Geopolitics: ['war', 'strike', 'missile', 'military', 'iran', 'israel', 'ukraine', 'russia', 'nato', 'conflict', 'troops', 'ceasefire', 'sanctions', 'diplomat', 'embassy', 'nuclear', 'weapons', 'attack', 'defence', 'defense', 'army', 'drone', 'beirut', 'gaza', 'hamas', 'hezbollah', 'taliban'],
-  Markets: ['stock', 'market', 'shares', 'bond', 'yield', 'investor', 'rally', 'sell-off', 'dow', 's&p', 'nasdaq', 'ftse', 'index', 'trading', 'equity', 'wall street'],
-  Macro: ['gdp', 'inflation', 'interest rate', 'central bank', 'fed', 'ecb', 'recession', 'growth', 'employment', 'unemployment', 'fiscal', 'monetary', 'deficit', 'debt', 'imf', 'world bank', 'tariff', 'trade war'],
-  Technology: ['ai', 'artificial intelligence', 'tech', 'chip', 'semiconductor', 'apple', 'google', 'microsoft', 'openai', 'crypto', 'bitcoin', 'quantum', 'cyber', 'software', 'data'],
-  Energy: ['oil', 'gas', 'opec', 'energy', 'renewable', 'solar', 'wind', 'nuclear power', 'pipeline', 'crude', 'barrel', 'refinery', 'petroleum'],
-  Business: ['merger', 'acquisition', 'ipo', 'earnings', 'revenue', 'profit', 'ceo', 'company', 'firm', 'corporate', 'deal'],
-  Policy: ['election', 'parliament', 'congress', 'legislation', 'regulation', 'court', 'supreme court', 'vote', 'law', 'governor', 'president', 'minister', 'prime minister'],
-};
-
 // Noise patterns to filter out non-news content
 const NOISE_PATTERNS = [
-  /subscribe/i,
-  /log\s*in/i,
-  /free trial/i,
-  /newsletter/i,
-  /sign\s*up/i,
-  /mind-expanding/i,
-  /delivered\s+(six|five|seven)\s+days/i,
-  /curated\s+news/i,
-  /direct\s+to\s+your\s+inbox/i,
-  /behind\s+the\s+scenes/i,
-  /future[- ]gazing\s+analysis/i,
-  /predictions\s+and\s+speculation/i,
-  /tune\s+into\s+captivating/i,
-  /registered\s+in\s+england/i,
-  /registered\s+office/i,
-  /vat\s+reg/i,
-  /newspaper\s+limited/i,
-  /word\s+of\s+the\s+week/i,
-  /copyright\s*©/i,
-  /all\s+rights\s+reserved/i,
-  /terms\s+of\s+(use|service)/i,
-  /privacy\s+policy/i,
-  /cookie\s+policy/i,
-  /©\s*\d{4}/,
-  /the\s+economist\s+newspaper/i,
+  /subscribe/i, /log\s*in/i, /free trial/i, /newsletter/i, /sign\s*up/i,
+  /mind-expanding/i, /delivered\s+(six|five|seven)\s+days/i, /curated\s+news/i,
+  /direct\s+to\s+your\s+inbox/i, /behind\s+the\s+scenes/i,
+  /future[- ]gazing\s+analysis/i, /predictions\s+and\s+speculation/i,
+  /tune\s+into\s+captivating/i, /registered\s+in\s+england/i,
+  /registered\s+office/i, /vat\s+reg/i, /newspaper\s+limited/i,
+  /word\s+of\s+the\s+week/i, /copyright\s*©/i, /all\s+rights\s+reserved/i,
+  /terms\s+of\s+(use|service)/i, /privacy\s+policy/i, /cookie\s+policy/i,
+  /©\s*\d{4}/, /the\s+economist\s+newspaper/i,
 ];
 
 function isNoise(text: string): boolean {
   return NOISE_PATTERNS.some(pattern => pattern.test(text));
-}
-
-function classifyTheme(text: string): string {
-  const lower = text.toLowerCase();
-  let bestTheme = 'Other';
-  let bestScore = 0;
-  for (const [theme, keywords] of Object.entries(THEME_KEYWORDS)) {
-    const score = keywords.filter(kw => lower.includes(kw)).length;
-    if (score > bestScore) {
-      bestScore = score;
-      bestTheme = theme;
-    }
-  }
-  return bestTheme;
 }
 
 function extractTitle(text: string): string {
@@ -74,6 +34,52 @@ function extractTitle(text: string): string {
   const boldMatch = text.match(/^([A-Z][^.]{10,60})\./);
   if (boldMatch) return boldMatch[1];
   return text.slice(0, 80).trim() + '…';
+}
+
+/**
+ * Call the AI classify endpoint to determine theme, content_type, and cluster match
+ */
+async function classifyWithAI(
+  supabase: ReturnType<typeof createClient>,
+  items: { id: string; title: string; summary: string }[],
+  userId: string
+): Promise<Map<string, { theme: string; content_type: string; cluster_id?: string }>> {
+  const result = new Map<string, { theme: string; content_type: string; cluster_id?: string }>();
+
+  try {
+    // Fetch active clusters for matching
+    const { data: clusters } = await supabase
+      .from('event_clusters')
+      .select('id, title, short_title, top_keywords, top_entities')
+      .eq('user_id', userId)
+      .in('status', ['active', 'developing']);
+
+    const { data, error } = await supabase.functions.invoke('ai-analyze', {
+      body: {
+        action: 'classify',
+        items: items.map(i => ({ id: i.id, title: i.title, summary: i.summary.substring(0, 500) })),
+        clusters: clusters || [],
+      },
+    });
+
+    if (error) {
+      console.error(`  ⚠ AI classification failed: ${error.message}`);
+      return result;
+    }
+
+    const classifications = data?.classifications || [];
+    for (const c of classifications) {
+      result.set(String(c.item_id), {
+        theme: c.theme || 'Other',
+        content_type: c.content_type || 'briefing',
+        cluster_id: c.cluster_id || undefined,
+      });
+    }
+  } catch (err: any) {
+    console.error(`  ⚠ AI classification error: ${err.message}`);
+  }
+
+  return result;
 }
 
 /**
@@ -149,7 +155,6 @@ export async function syncBriefing(url: string = 'https://www.economist.com/the-
     const cleanItems = rawItems.filter(text => {
       if (text.length < 80 || text.length > 2000) return false;
       if (isNoise(text)) return false;
-      // Must contain at least some news-like content (proper nouns, numbers, dates)
       const hasProperNoun = /[A-Z][a-z]{2,}/.test(text);
       const hasSpecifics = /\d/.test(text) || /said|announced|reported|according/i.test(text);
       return hasProperNoun && hasSpecifics;
@@ -157,35 +162,97 @@ export async function syncBriefing(url: string = 'https://www.economist.com/the-
 
     console.log(`  ${cleanItems.length} items after noise filter (removed ${rawItems.length - cleanItems.length})`);
 
-    // Prepare items for database
-    const itemsToInsert = cleanItems.map(text => {
+    // Prepare items with temporary IDs for classification
+    const preparedItems = cleanItems.map((text, i) => {
       const contentHash = createHash('sha256').update(text.slice(0, 200)).digest('hex');
       return {
-        user_id: userId,
+        tempId: String(i),
         title: extractTitle(text),
         summary: text,
-        theme: classifyTheme(text),
-        source_name: 'The Economist',
         content_hash: contentHash,
-        published_at: new Date().toISOString(),
       };
     });
 
-    // Insert into briefing_updates table (upsert based on content_hash)
-    for (const item of itemsToInsert) {
-      const { error } = await supabase
-        .from('briefing_updates')
-        .upsert(item, { onConflict: 'user_id,content_hash', ignoreDuplicates: false });
+    // Use AI to classify each item's theme, content_type, and cluster
+    console.log(`  🤖 Classifying ${preparedItems.length} items with AI...`);
+    const classifications = await classifyWithAI(
+      supabase,
+      preparedItems.map(p => ({ id: p.tempId, title: p.title, summary: p.summary })),
+      userId
+    );
 
-      if (error) {
-        console.error(`  ✗ Failed to insert briefing item: ${error.message}`);
+    console.log(`  ✓ AI classified ${classifications.size}/${preparedItems.length} items`);
+
+    // Route items based on AI classification
+    let briefingCount = 0;
+    let articleCount = 0;
+
+    for (const item of preparedItems) {
+      const classification = classifications.get(item.tempId);
+      const theme = classification?.theme || 'Other';
+      const contentType = classification?.content_type || 'briefing';
+      const clusterId = classification?.cluster_id || null;
+
+      if (contentType === 'article') {
+        // Insert as a full article
+        const { error } = await supabase.from('articles').upsert({
+          user_id: userId,
+          title: item.title,
+          body_text: item.summary,
+          source_name: 'The Economist',
+          canonical_url: `${url}#item-${item.content_hash.slice(0, 8)}`,
+          content_hash: item.content_hash,
+          topic_tags: [theme],
+          published_at: new Date().toISOString(),
+          status: 'imported',
+        }, { onConflict: 'user_id,content_hash' });
+
+        if (error) {
+          console.error(`  ✗ Failed to insert article: ${error.message}`);
+        } else {
+          articleCount++;
+          // If matched to a cluster, link it
+          if (clusterId) {
+            const { data: art } = await supabase
+              .from('articles')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('content_hash', item.content_hash)
+              .single();
+            if (art) {
+              await supabase.from('event_cluster_articles').upsert({
+                cluster_id: clusterId,
+                article_id: art.id,
+                relevance_score: 0.8,
+              }, { onConflict: 'cluster_id,article_id' });
+            }
+          }
+        }
+      } else {
+        // Insert as briefing update
+        const { error } = await supabase.from('briefing_updates').upsert({
+          user_id: userId,
+          title: item.title,
+          summary: item.summary,
+          theme,
+          source_name: 'The Economist',
+          content_hash: item.content_hash,
+          published_at: new Date().toISOString(),
+          cluster_id: clusterId,
+        }, { onConflict: 'user_id,content_hash', ignoreDuplicates: false });
+
+        if (error) {
+          console.error(`  ✗ Failed to insert briefing item: ${error.message}`);
+        } else {
+          briefingCount++;
+        }
       }
     }
 
-    console.log(`  ✓ Synced ${itemsToInsert.length} briefing items to database`);
+    console.log(`  ✓ Routed: ${briefingCount} briefing updates, ${articleCount} articles`);
 
-    // Trigger AI enrichment via edge function
-    console.log(`  🤖 Triggering AI enrichment...`);
+    // Trigger AI enrichment for briefing items (why_it_matters)
+    console.log(`  🤖 Triggering briefing enrichment...`);
     const { error: enrichError } = await supabase.functions.invoke('ai-analyze', {
       body: { action: 'enrich-briefing' }
     });
