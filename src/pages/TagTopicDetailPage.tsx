@@ -204,7 +204,7 @@ export default function TagTopicDetailPage() {
                       item.type === 'update' ? 'bg-primary' : 'bg-muted-foreground'
                     )} />
                     {item.type === 'update' ? (
-                      <UpdateCard update={item.data} />
+                      <UpdateCard update={item.data} highlighted={highlightId === item.data.id} />
                     ) : (
                       <Link to={`/articles/${item.data.id}`}>
                         <div className="flex items-center gap-4 bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-colors group">
