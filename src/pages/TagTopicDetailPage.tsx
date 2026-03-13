@@ -73,6 +73,8 @@ function UpdateCard({ update, highlighted }: { update: { id: string; title: stri
 
 export default function TagTopicDetailPage() {
   const { tag } = useParams();
+  const location = useLocation();
+  const highlightId = (location.state as any)?.highlightId as string | undefined;
   const decodedTag = decodeURIComponent(tag || '');
   const goBack = () => window.history.back();
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
