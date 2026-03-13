@@ -272,7 +272,7 @@ export default function TagTopicDetailPage() {
                   {matchedUpdates.map((update: any) => (
                     <div key={update.id} className="relative pl-8">
                       <div className="absolute left-[7px] top-4 w-[9px] h-[9px] rounded-full bg-primary border-2 border-background" />
-                      <UpdateCard update={update} />
+                      <UpdateCard update={update} highlighted={highlightId === update.id} />
                     </div>
                   ))}
                 </div>
