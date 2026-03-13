@@ -24,15 +24,36 @@ function formatRelativeTime(dateStr: string) {
   return `${days}d ago`;
 }
 
-function UpdateCard({ update }: { update: { id: string; title: string; summary: string; source_name: string; published_at: string } }) {
+function UpdateCard({ update, highlighted }: { update: { id: string; title: string; summary: string; source_name: string; published_at: string }; highlighted?: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (highlighted && ref.current) {
+      setTimeout(() => {
+        ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+    }
+  }, [highlighted]);
+
   return (
-    <div className="bg-card border border-border rounded-xl p-4 transition-colors">
+    <div
+      ref={ref}
+      className={cn(
+        "bg-card border rounded-xl p-4 transition-all duration-700",
+        highlighted
+          ? "border-primary ring-2 ring-primary/20 shadow-lg shadow-primary/10"
+          : "border-border"
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[10px] text-muted-foreground">{formatRelativeTime(update.published_at)}</span>
             <SourceBadge name={update.source_name} />
+            {highlighted && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">You were here</span>
+            )}
           </div>
           <h4 className="font-medium text-sm mb-1">{update.title}</h4>
           <p className={cn(
