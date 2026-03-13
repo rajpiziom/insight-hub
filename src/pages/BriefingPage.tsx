@@ -76,6 +76,11 @@ function BriefingTile({ item, index }: { item: DisplayItem; index: number }) {
               <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
                 <SourceBadge name={item.source_name} />
                 <div className="flex items-center gap-1.5">
+                  {item.theme && (
+                    <Link to={`/tag/${encodeURIComponent(item.theme)}`} state={{ highlightId: item.id }} onClick={(e) => e.stopPropagation()}>
+                      <Button variant="outline" size="sm" className="text-xs gap-1 h-7">View Topic →</Button>
+                    </Link>
+                  )}
                   {item.article_id && (
                     <Link to={`/articles/${item.article_id}`} onClick={(e) => e.stopPropagation()}>
                       <Button variant="outline" size="sm" className="text-xs gap-1 h-7">Read Article →</Button>

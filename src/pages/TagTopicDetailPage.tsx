@@ -1,5 +1,5 @@
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Hash, BookOpen, Bell, Clock, ChevronDown, ChevronUp, Loader2, LayoutList, Columns } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,15 +24,36 @@ function formatRelativeTime(dateStr: string) {
   return `${days}d ago`;
 }
 
-function UpdateCard({ update }: { update: { id: string; title: string; summary: string; source_name: string; published_at: string } }) {
+function UpdateCard({ update, highlighted }: { update: { id: string; title: string; summary: string; source_name: string; published_at: string }; highlighted?: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (highlighted && ref.current) {
+      setTimeout(() => {
+        ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 400);
+    }
+  }, [highlighted]);
+
   return (
-    <div className="bg-card border border-border rounded-xl p-4 transition-colors">
+    <div
+      ref={ref}
+      className={cn(
+        "bg-card border rounded-xl p-4 transition-all duration-700",
+        highlighted
+          ? "border-primary ring-2 ring-primary/20 shadow-lg shadow-primary/10"
+          : "border-border"
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-[10px] text-muted-foreground">{formatRelativeTime(update.published_at)}</span>
             <SourceBadge name={update.source_name} />
+            {highlighted && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">You were here</span>
+            )}
           </div>
           <h4 className="font-medium text-sm mb-1">{update.title}</h4>
           <p className={cn(
@@ -52,6 +73,8 @@ function UpdateCard({ update }: { update: { id: string; title: string; summary: 
 
 export default function TagTopicDetailPage() {
   const { tag } = useParams();
+  const location = useLocation();
+  const highlightId = (location.state as any)?.highlightId as string | undefined;
   const decodedTag = decodeURIComponent(tag || '');
   const goBack = () => window.history.back();
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
@@ -181,7 +204,7 @@ export default function TagTopicDetailPage() {
                       item.type === 'update' ? 'bg-primary' : 'bg-muted-foreground'
                     )} />
                     {item.type === 'update' ? (
-                      <UpdateCard update={item.data} />
+                      <UpdateCard update={item.data} highlighted={highlightId === item.data.id} />
                     ) : (
                       <Link to={`/articles/${item.data.id}`}>
                         <div className="flex items-center gap-4 bg-card border border-border rounded-xl p-4 hover:border-primary/30 transition-colors group">
@@ -249,7 +272,7 @@ export default function TagTopicDetailPage() {
                   {matchedUpdates.map((update: any) => (
                     <div key={update.id} className="relative pl-8">
                       <div className="absolute left-[7px] top-4 w-[9px] h-[9px] rounded-full bg-primary border-2 border-background" />
-                      <UpdateCard update={update} />
+                      <UpdateCard update={update} highlighted={highlightId === update.id} />
                     </div>
                   ))}
                 </div>
